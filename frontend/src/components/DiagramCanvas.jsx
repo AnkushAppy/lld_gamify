@@ -34,7 +34,7 @@ export default function DiagramCanvas({ source }) {
         }
       } catch (error) {
         if (!cancelled) {
-          containerRef.current.innerHTML = `<pre class="diagram-error">${error.message}</pre>`;
+          containerRef.current.innerHTML = `<pre class="text-rose-300 text-sm whitespace-pre-wrap">${error.message}</pre>`;
         }
       }
     }
@@ -46,11 +46,21 @@ export default function DiagramCanvas({ source }) {
   }, [source, renderId]);
 
   return (
-    <div className="diagram-panel">
-      <div ref={containerRef} className="diagram-render" />
-      <details className="source-panel" open>
-        <summary>Mermaid Source</summary>
-        <textarea readOnly value={source} rows={10} />
+    <div className="space-y-4">
+      <div
+        ref={containerRef}
+        className="min-h-[360px] w-full flex items-center justify-center overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-6"
+      />
+      <details className="rounded-lg border border-slate-800 bg-slate-950 p-3">
+        <summary className="cursor-pointer text-sm text-slate-400">
+          Mermaid Source (copy to mermaid.live)
+        </summary>
+        <textarea
+          readOnly
+          value={source}
+          rows={8}
+          className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-900 p-3 font-mono text-xs text-slate-300"
+        />
       </details>
     </div>
   );

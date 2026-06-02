@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -8,21 +9,13 @@ from pydantic import BaseModel
 
 from backend.canvas_engine import init_canvas
 
-CONFIG_PATH = os.environ.get(
-    "QUIZ_CONFIG_PATH",
-    "content/parking_lot_blueprint/quiz_config.json",
-)
-
-if not os.path.exists(CONFIG_PATH):
-    raise FileNotFoundError(f"Configuration missing at {CONFIG_PATH}")
-
-with open(CONFIG_PATH, encoding="utf-8") as f:
-    game_data: dict[str, Any] = json.load(f)
+CONTENT_DIR = Path(os.environ.get("CONTENT_DIR", "content"))
+TRACKS_MANIFEST = CONTENT_DIR / "tracks.json"
 
 app = FastAPI(
     title="LLD Speedrun Gamifier API",
     description="REST API for Blueprint Assembly game validation.",
-    version="3.0.0",
+    version="3.1.0",
 )
 
 app.add_middleware(
@@ -33,8 +26,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_config_cache: dict[str, dict[str, Any]] = {}
+
 
 class AnswerSubmission(BaseModel):
+    system_id: str
     level_index: int
     question_id: str
     selected_answer: str
@@ -47,8 +43,48 @@ class ValidationResult(BaseModel):
     skill_tag: str
 
 
-def _find_question(level_index: int, question_id: str) -> dict[str, Any]:
-    levels = game_data["levels"]
+def _discover_config_paths() -> dict[str, Path]:
+    discovered: dict[str, Path] = {}
+    if not CONTENT_DIR.exists():
+        return discovered
+
+    for folder in CONTENT_DIR.iterdir():
+        if not folder.is_dir():
+            continue
+        config_path = folder / "quiz_config.json"
+        if config_path.exists():
+            discovered[folder.name] = config_path
+    return discovered
+
+
+def _load_config(system_id: str) -> dict[str, Any]:
+    if system_id in _config_cache:
+        return _config_cache[system_id]
+
+    config_paths = _discover_config_paths()
+    config_path = config_paths.get(system_id)
+    if not config_path:
+        raise HTTPException(status_code=404, detail=f"System '{system_id}' not found.")
+
+    with config_path.open(encoding="utf-8") as f:
+        config = json.load(f)
+
+    _config_cache[system_id] = config
+    return config
+
+
+def _load_tracks_manifest() -> list[dict[str, Any]]:
+    if not TRACKS_MANIFEST.exists():
+        return []
+
+    with TRACKS_MANIFEST.open(encoding="utf-8") as f:
+        payload = json.load(f)
+
+    return payload.get("tracks", [])
+
+
+def _find_question(config: dict[str, Any], level_index: int, question_id: str) -> dict[str, Any]:
+    levels = config["levels"]
     if level_index < 1 or level_index > len(levels):
         raise HTTPException(status_code=400, detail="Invalid level index.")
 
@@ -70,13 +106,13 @@ def _sanitize_question(question: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _sanitize_config() -> dict[str, Any]:
-    total_questions = sum(len(level["questions"]) for level in game_data["levels"])
+def _sanitize_config(config: dict[str, Any]) -> dict[str, Any]:
+    total_questions = sum(len(level["questions"]) for level in config["levels"])
     return {
-        "system_id": game_data["system_id"],
-        "system_title": game_data["system_title"],
+        "system_id": config["system_id"],
+        "system_title": config["system_title"],
         "initial_canvas": init_canvas(),
-        "total_levels": len(game_data["levels"]),
+        "total_levels": len(config["levels"]),
         "total_questions": total_questions,
         "levels": [
             {
@@ -85,7 +121,7 @@ def _sanitize_config() -> dict[str, Any]:
                 "description": level.get("description", ""),
                 "questions": [_sanitize_question(q) for q in level["questions"]],
             }
-            for level in game_data["levels"]
+            for level in config["levels"]
         ],
     }
 
@@ -95,21 +131,72 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/systems")
+def list_systems():
+    """Return dashboard track cards; available only when quiz config exists."""
+    discovered = _discover_config_paths()
+    manifest = _load_tracks_manifest()
+
+    if manifest:
+        tracks = []
+        for track in manifest:
+            system_id = track["system_id"]
+            has_config = system_id in discovered
+            tracks.append(
+                {
+                    "system_id": system_id,
+                    "icon": track.get("icon", "📦"),
+                    "title": track.get("title", system_id),
+                    "tagline": track.get("tagline", ""),
+                    "available": has_config and track.get("available", True),
+                }
+            )
+        return {"tracks": tracks}
+
+    tracks = []
+    for system_id, path in discovered.items():
+        with path.open(encoding="utf-8") as f:
+            config = json.load(f)
+        first_level = config["levels"][0] if config.get("levels") else {}
+        tracks.append(
+            {
+                "system_id": system_id,
+                "icon": "📦",
+                "title": config.get("system_title", system_id),
+                "tagline": first_level.get("description", ""),
+                "available": True,
+            }
+        )
+    return {"tracks": tracks}
+
+
+@app.get("/api/game/start/{system_id}")
+def start_game(system_id: str):
+    """Return quiz structure for a system without answers or mutations."""
+    config = _load_config(system_id)
+    return _sanitize_config(config)
+
+
 @app.get("/api/game/start")
-def start_game():
-    """Return quiz structure without answers or mutations."""
-    return _sanitize_config()
+def start_default_game():
+    """Backward-compatible default: first available system."""
+    discovered = _discover_config_paths()
+    if not discovered:
+        raise HTTPException(status_code=404, detail="No quiz configs found.")
+    first_id = sorted(discovered.keys())[0]
+    return start_game(first_id)
 
 
-@app.get("/api/config")
-def get_config():
+@app.get("/api/config/{system_id}")
+def get_config(system_id: str):
     """Full config for authoring/debug only."""
-    return game_data
+    return _load_config(system_id)
 
 
 @app.post("/api/game/validate", response_model=ValidationResult)
 def validate_answer(submission: AnswerSubmission):
-    question = _find_question(submission.level_index, submission.question_id)
+    config = _load_config(submission.system_id)
+    question = _find_question(config, submission.level_index, submission.question_id)
     is_correct = submission.selected_answer == question["correct_answer"]
 
     return ValidationResult(

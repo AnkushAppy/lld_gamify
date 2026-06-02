@@ -1,0 +1,202 @@
+{
+    "system_id": "coupon_service_blueprint",
+    "system_title": "Enterprise Discount & Coupon Engine LLD",
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Core Entity Definition & Encapsulation",
+            "description": "Establish the foundational domain models for the coupon engine, define state constraints, and enforce encapsulation to protect data invariants.",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "In a Promotional Engine, what is the core domain entity that encapsulates the rules, lifecycle, and identity of a promotional offer?",
+                    "choices": [
+                        "DatabaseManager",
+                        "Coupon",
+                        "DiscountCodeString"
+                    ],
+                    "correct_answer": "Coupon",
+                    "explanation": "The 'Coupon' is a primary Domain Entity (Aggregate Root). It possesses a distinct identity, an ongoing lifecycle, and encapsulates the business rules and constraints of a promotion, far beyond a simple primitive string.",
+                    "uml_mutation": "class Coupon\n"
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "State Modeling",
+                    "type": "radio",
+                    "text": "A coupon transitions through various lifecycle phases (e.g., ACTIVE, DEPLETED, EXPIRED). How should we structurally constrain these states to prevent invalid domain transitions?",
+                    "choices": [
+                        "Use a loosely typed String variable named 'status'.",
+                        "Use an integer flag where 0=ACTIVE, 1=DEPLETED, 2=EXPIRED.",
+                        "Create a dedicated CouponStatus Enumeration."
+                    ],
+                    "correct_answer": "Create a dedicated CouponStatus Enumeration.",
+                    "explanation": "A dedicated Enum ensures compile-time type safety, eliminating the risk of systemic typo errors ('ACTVE') and invalid state assignments, thereby strictly enforcing the domain's state space.",
+                    "uml_mutation": "class CouponStatus {\n    <<enumeration>>\n    ACTIVE\n    DEPLETED\n    EXPIRED\n}\nCoupon --> CouponStatus : current_state\n"
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "Attribute Visibility",
+                    "type": "radio",
+                    "text": "The alphanumeric 'code' of a Coupon (e.g., 'SAVE20') must be readable for validation but strictly immutable after creation to prevent tampering. Which visibility strategy enforces this?",
+                    "choices": [
+                        "- String code (Private field with a getter, but no setter)",
+                        "+ String code (Public field for easy access)",
+                        "# String code (Protected field)"
+                    ],
+                    "correct_answer": "- String code (Private field with a getter, but no setter)",
+                    "explanation": "Private visibility coupled with an explicit getter and the absence of a setter enforces runtime immutability. This guarantees the code remains unchanged throughout the object's lifecycle.",
+                    "uml_mutation": "class Coupon {\n    -String code\n    -LocalDateTime expiryDate\n    +getCode() : String\n}\n"
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Structural Relations & Multiplicity Mapping",
+            "description": "Map structural associations between user carts, applied discounts, and abstract policy constraints.",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "A customer attempts to apply a Coupon to their Cart. The Cart exists independently of the Coupon, and a Coupon can exist without being attached to a Cart. What UML relationship defines this?",
+                    "choices": [
+                        "Composition (Filled diamond)",
+                        "Aggregation (Hollow diamond)",
+                        "Inheritance (Solid line with hollow triangle)"
+                    ],
+                    "correct_answer": "Aggregation (Hollow diamond)",
+                    "explanation": "Aggregation represents a 'has-a' relationship where the child lifecycle (Coupon) is independent of the parent lifecycle (Cart). Neither object destroys the other upon deletion.",
+                    "uml_mutation": "class Cart {\n    -String cartId\n    -double totalAmount\n}\nCart o-- Coupon : applies_to\n"
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "A Cart acts as a container for multiple CartItems. If a user abandons and deletes their Cart, the localized CartItems must also be destroyed. How do we model this strict ownership?",
+                    "choices": [
+                        "Composition (Filled black diamond from Cart to CartItem)",
+                        "Aggregation (Hollow diamond from Cart to CartItem)",
+                        "Dependency (Dotted line from CartItem to Cart)"
+                    ],
+                    "correct_answer": "Composition (Filled black diamond from Cart to CartItem)",
+                    "explanation": "Composition strictly dictates that the part (CartItem) cannot exist without the whole (Cart). Deleting the Cart cascades the deletion to all its items.",
+                    "uml_mutation": "class CartItem {\n    -String productId\n    -double price\n    -int quantity\n}\nCart \"1\" *-- \"*\" CartItem : contains\n"
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "Coupons can offer a 'Flat Amount' (e.g., $10 off) or a 'Percentage' (e.g., 20% off) discount. To adhere to the Open-Closed Principle, how should we structurally model the discount logic?",
+                    "choices": [
+                        "Add a 'type' String to the Coupon class and use switch-case statements for calculations.",
+                        "Extract the logic into an abstract 'DiscountPolicy' class or interface, and inherit specific implementations.",
+                        "Store both 'flatAmount' and 'percentage' variables in the Coupon class and check which one is non-zero."
+                    ],
+                    "correct_answer": "Extract the logic into an abstract 'DiscountPolicy' class or interface, and inherit specific implementations.",
+                    "explanation": "Polymorphism allows us to isolate behaviors. By defining an abstract DiscountPolicy, we can seamlessly introduce new discount types (like 'Buy One Get One') in the future without modifying existing domain code.",
+                    "uml_mutation": "class DiscountPolicy {\n    <<abstract>>\n    -double maxLimit\n}\nclass PercentagePolicy\nclass FlatAmountPolicy\nDiscountPolicy <|-- PercentagePolicy\nDiscountPolicy <|-- FlatAmountPolicy\nCoupon *-- DiscountPolicy : enforces\n"
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Interface Behaviors & Design Patterns",
+            "description": "Implement behavioral design patterns to handle dynamic calculations and multi-step validation processes.",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "We need to calculate the final discount. Based on the Strategy Pattern, what is the best method signature to add to our `DiscountPolicy` hierarchy?",
+                    "choices": [
+                        "+calculateDiscount() void",
+                        "+calculateDiscount(Cart cart) double",
+                        "+calculateDiscount(double amount, int quantity, String type) double"
+                    ],
+                    "correct_answer": "+calculateDiscount(Cart cart) double",
+                    "explanation": "Passing the aggregate root (`Cart`) provides the strategy with all the necessary context (total amount, items, quantities) to compute the discount, ensuring the signature remains stable even if calculation logic requires new cart properties later.",
+                    "uml_mutation": "class DiscountPolicy {\n    +calculateDiscount(Cart cart) : double\n}\nclass PercentagePolicy {\n    -double percentage\n    +calculateDiscount(Cart cart) : double\n}\nclass FlatAmountPolicy {\n    -double amount\n    +calculateDiscount(Cart cart) : double\n}\n"
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "Applying a coupon requires multiple checks: Is it expired? Does the cart meet the minimum value? Has the user reached their limit? Which GoF design pattern cleanly models this sequential validation?",
+                    "choices": [
+                        "The Singleton Pattern",
+                        "The Chain of Responsibility Pattern",
+                        "The Observer Pattern"
+                    ],
+                    "correct_answer": "The Chain of Responsibility Pattern",
+                    "explanation": "Chain of Responsibility allows a request to pass along a chain of handlers. Each validator (Expiry, MinValue, UserLimit) decides either to process the request (fail validation) or pass it to the next validator, decoupling the logic.",
+                    "uml_mutation": "class CouponValidator {\n    <<interface>>\n    +validate(Coupon coupon, Cart cart) : boolean\n}\nclass ExpiryValidator {\n    +validate(Coupon coupon, Cart cart) : boolean\n}\nclass MinAmountValidator {\n    +validate(Coupon coupon, Cart cart) : boolean\n}\nCouponValidator <|.. ExpiryValidator\nCouponValidator <|.. MinAmountValidator\n"
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "To form the Chain of Responsibility, the validators need a way to link to one another. How is this structural linkage implemented in the `CouponValidator` interface?",
+                    "choices": [
+                        "By extending the Coupon class directly.",
+                        "By holding an aggregation reference to another `CouponValidator` (a 'next' pointer).",
+                        "By returning a boolean flag to a massive while-loop in the controller."
+                    ],
+                    "correct_answer": "By holding an aggregation reference to another `CouponValidator` (a 'next' pointer).",
+                    "explanation": "The interface/abstract class holds a reference to the next handler in the chain. This directed aggregation allows dynamic construction of the validation pipeline at runtime.",
+                    "uml_mutation": "class CouponValidator {\n    +setNext(CouponValidator nextValidator)\n}\nExpiryValidator o-- CouponValidator : next\nMinAmountValidator o-- CouponValidator : next\n"
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: System Orchestration & Concurrency",
+            "description": "Design the main entry point, handle concurrent redemption attempts, and maintain historical audit trails.",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "We need a primary entry point to coordinate retrieving the coupon, triggering the validation chain, and applying the discount policy. Which structural pattern describes this class?",
+                    "choices": [
+                        "The Facade Pattern (CouponService)",
+                        "The Prototype Pattern",
+                        "The Decorator Pattern"
+                    ],
+                    "correct_answer": "The Facade Pattern (CouponService)",
+                    "explanation": "A Facade (e.g., CouponService) simplifies a complex subsystem by providing a single, unified interface for clients (like a Checkout API) to interact with, hiding the complexity of validators and policies.",
+                    "uml_mutation": "class CouponService {\n    -CouponValidator validatorChain\n    +applyCoupon(String code, Cart cart) : double\n}\nCouponService --> CouponValidator : triggers_validation\nCouponService --> Coupon : retrieves\n"
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "A malicious user tries to redeem a single-use coupon simultaneously on two devices to double their discount. How must the `redeemCoupon()` method be designed to prevent this race condition?",
+                    "choices": [
+                        "It must perform an optimistic UI update and return void.",
+                        "It must execute within a thread-safe, transactional atomic block (utilizing distributed locks or database constraints) before mutating the coupon state.",
+                        "It should simply check `if (coupon.isActive())` and then update the state sequentially."
+                    ],
+                    "correct_answer": "It must execute within a thread-safe, transactional atomic block (utilizing distributed locks or database constraints) before mutating the coupon state.",
+                    "explanation": "In concurrent environments, check-then-act operations lead to race conditions. The redemption process must be atomic, locking the resource or utilizing transactional guarantees to ensure a single-use coupon is consumed exactly once.",
+                    "uml_mutation": "class CouponService {\n    -CouponValidator validatorChain\n    +applyCoupon(String code, Cart cart) : double\n    +redeemCoupon(String code, String userId) : boolean\n}\n"
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "To prevent fraud and enforce limits (e.g., '1 use per user'), the system must maintain an audit trail of every time a coupon is successfully applied. Structurally, how is this mapped to the Coupon?",
+                    "choices": [
+                        "A Coupon aggregates exactly one User.",
+                        "A Coupon is composed of multiple CouponUsage records (1 to Many).",
+                        "The Coupon object should hold a single 'lastUsedBy' String field."
+                    ],
+                    "correct_answer": "A Coupon is composed of multiple CouponUsage records (1 to Many).",
+                    "explanation": "A 1-to-Many composition mapping to an audit entity (`CouponUsage`) allows the system to track detailed historical metadata (who used it, when, on what order) essential for validating per-user limits and analyzing campaign success.",
+                    "uml_mutation": "class CouponUsage {\n    -String usageId\n    -String userId\n    -LocalDateTime usedAt\n}\nCoupon \"1\" *-- \"*\" CouponUsage : tracks_history\n"
+                }
+            ]
+        }
+    ]
+}

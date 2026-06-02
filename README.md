@@ -50,9 +50,10 @@ The Vite dev server proxies `/api` requests to the FastAPI backend on port 8000.
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `GET` | `/api/game/start` | Quiz structure (no answers/mutations) |
-| `POST` | `/api/game/validate` | Validate answer, return explanation + mutation |
-| `GET` | `/api/config` | Full config (authoring/debug) |
+| `GET` | `/api/systems` | Dashboard track list |
+| `GET` | `/api/game/start/{system_id}` | Quiz structure (no answers/mutations) |
+| `POST` | `/api/game/validate` | Validate answer (`system_id` required) |
+| `GET` | `/api/config/{system_id}` | Full config (authoring/debug) |
 
 ## Configuration
 

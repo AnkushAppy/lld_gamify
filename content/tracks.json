@@ -1,0 +1,32 @@
+{
+  "tracks": [
+    {
+      "system_id": "parking_lot_blueprint",
+      "icon": "🅿️",
+      "title": "Parking Lot Architecture",
+      "tagline": "Encapsulation, composition, and strategy patterns.",
+      "available": true
+    },
+    {
+      "system_id": "coupon_service_blueprint",
+      "icon": "🎟️",
+      "title": "Discount & Coupon Engine",
+      "tagline": "Strategy, Chain of Responsibility, and Facade patterns.",
+      "available": true
+    },
+    {
+      "system_id": "splitwise",
+      "icon": "💸",
+      "title": "Splitwise Expense Engine",
+      "tagline": "Graph balancing, user splits, and transactional atomicity.",
+      "available": false
+    },
+    {
+      "system_id": "elevator",
+      "icon": "🛗",
+      "title": "Elevator Control Dispatcher",
+      "tagline": "State patterns, request queues, and hardware wrappers.",
+      "available": false
+    }
+  ]
+}
