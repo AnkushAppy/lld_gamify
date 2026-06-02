@@ -1,0 +1,18 @@
+{
+  "tracks": [
+    {
+      "system_id": "url_shortener_hld",
+      "icon": "🔗",
+      "title": "URL Shortener at Scale",
+      "tagline": "Load balancing, caching, and database sharding for billions of redirects.",
+      "available": true
+    },
+    {
+      "system_id": "taxi_booking_hld",
+      "icon": "🚕",
+      "title": "Taxi Booking Engine",
+      "tagline": "WebSockets, geospatial indexing, Kafka streams, and surge pricing.",
+      "available": true
+    }
+  ]
+}

@@ -1,0 +1,226 @@
+{
+    "system_id": "url_shortener_hld",
+    "discipline": "hld",
+    "canvas_type": "flowchart",
+    "system_title": "URL Shortener — High-Level Architecture",
+    "chaos_scenario": {
+        "title": "Simulating Black Friday Traffic (10x load)...",
+        "success_badge": "Master Infrastructure Architect",
+        "steps": [
+            { "label": "10M req/s hits the Global Load Balancer", "status": "ok" },
+            { "label": "CDN + edge cache absorb 94% of redirect reads", "status": "ok" },
+            { "label": "Write spikes safely buffered in Kafka", "status": "ok" },
+            { "label": "Sharded DB replicas stay within SLA", "status": "ok" }
+        ]
+    },
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Client Ingress & Edge Layer",
+            "description": "Route global traffic safely and eliminate single points of failure at the entry point.",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "High Availability",
+                    "type": "radio",
+                    "text": "Billions of users hit your shortener globally. What is the first infrastructure component that distributes traffic across healthy regions?",
+                    "choices": [
+                        "A single Nginx server on one VM",
+                        "A Global Load Balancer (DNS + anycast routing)",
+                        "A monolithic application server"
+                    ],
+                    "correct_answer": "A Global Load Balancer (DNS + anycast routing)",
+                    "explanation": "A global load balancer removes the single point of failure at ingress and routes users to the nearest healthy region, improving both availability and latency.",
+                    "uml_mutation": "    client((Client)) --> glb[Global Load Balancer]\n",
+                    "health_impact": { "availability": 10, "latency": -15, "cost": 3 }
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "Latency Optimization",
+                    "type": "radio",
+                    "text": "Most URL lookups are read-heavy and repeat the same popular links. Which edge component dramatically cuts redirect latency for hot URLs?",
+                    "choices": [
+                        "CDN / Edge Cache",
+                        "Write-ahead log on primary DB",
+                        "Batch cron job every hour"
+                    ],
+                    "correct_answer": "CDN / Edge Cache",
+                    "explanation": "A CDN caches redirect responses at the edge, serving repeated lookups in single-digit milliseconds instead of round-tripping to origin.",
+                    "uml_mutation": "    glb --> cdn[CDN / Edge Cache]\n",
+                    "health_impact": { "availability": 4, "latency": -40, "cost": 5 }
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "Fault Tolerance",
+                    "type": "radio",
+                    "text": "If one origin data-center fails, traffic must fail over automatically. What pattern prevents users from hitting a dead region?",
+                    "choices": [
+                        "Health checks with automatic failover at the load balancer",
+                        "Manual DNS edits during incidents",
+                        "Retry loops in the mobile client only"
+                    ],
+                    "correct_answer": "Health checks with automatic failover at the load balancer",
+                    "explanation": "Active health checks let the load balancer drain unhealthy targets and route around failures without human intervention.",
+                    "uml_mutation": "    cdn --> api[API Gateway]\n    glb -.->|health check| api\n",
+                    "health_impact": { "availability": 12, "latency": -5, "cost": 2 }
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Application & Caching Tier",
+            "description": "Decouple read/write paths and absorb traffic spikes before they hit persistent storage.",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Scalability",
+                    "type": "radio",
+                    "text": "Redirect lookups vastly outnumber URL creation. How should read traffic be served to protect the database?",
+                    "choices": [
+                        "Route every read directly to the primary database",
+                        "Front the service with a distributed cache (Redis/Memcached)",
+                        "Store all mappings in local app memory on one server"
+                    ],
+                    "correct_answer": "Front the service with a distributed cache (Redis/Memcached)",
+                    "explanation": "A distributed cache absorbs the read-heavy workload, keeping hot keys in memory and shielding the database from flash crowds.",
+                    "uml_mutation": "    api --> svc[Redirect Service]\n    svc --> cache[(Redis Cache)]\n",
+                    "health_impact": { "availability": 6, "latency": -30, "cost": 4 }
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "Async Processing",
+                    "type": "radio",
+                    "text": "Creating a short URL triggers analytics, uniqueness checks, and counter updates. What decouples write spikes from synchronous API latency?",
+                    "choices": [
+                        "A message queue (Kafka / SQS)",
+                        "Synchronous two-phase commit across 5 DBs",
+                        "Blocking the HTTP request until all analytics finish"
+                    ],
+                    "correct_answer": "A message queue (Kafka / SQS)",
+                    "explanation": "Queues decouple producers from consumers, letting the API respond quickly while background workers process durable side effects.",
+                    "uml_mutation": "    svc --> queue[[Kafka Queue]]\n    queue --> worker[Analytics Worker]\n",
+                    "health_impact": { "availability": 8, "latency": -20, "cost": 6 }
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Single Point of Failure",
+                    "type": "radio",
+                    "text": "Running one Redirect Service instance creates a bottleneck and SPOF. What is the standard fix?",
+                    "choices": [
+                        "Horizontally scale stateless service instances behind the API gateway",
+                        "Upgrade to a bigger single machine vertically",
+                        "Move all logic into the database stored procedures"
+                    ],
+                    "correct_answer": "Horizontally scale stateless service instances behind the API gateway",
+                    "explanation": "Stateless horizontal scaling lets you add capacity elastically and survive individual instance failures without downtime.",
+                    "uml_mutation": "    api --> svc2[Redirect Service Replica]\n",
+                    "health_impact": { "availability": 14, "latency": -10, "cost": 5 }
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Data Persistence & Consistency",
+            "description": "Design durable storage that scales past a single database node.",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Data Partitioning",
+                    "type": "radio",
+                    "text": "A single relational database cannot store billions of mappings. What technique spreads rows across multiple nodes?",
+                    "choices": [
+                        "Database sharding by hash of short code",
+                        "One giant table with no indexes",
+                        "Daily CSV exports to S3"
+                    ],
+                    "correct_answer": "Database sharding by hash of short code",
+                    "explanation": "Hash-based sharding distributes keys evenly across shards, letting write and read throughput scale linearly with cluster size.",
+                    "uml_mutation": "    cache --> db[(Sharded DB Cluster)]\n    worker --> db\n",
+                    "health_impact": { "availability": 7, "latency": -8, "cost": 12 }
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Read Replicas",
+                    "type": "radio",
+                    "text": "Cache misses still need fast reads without hammering shard primaries. What pattern offloads read traffic?",
+                    "choices": [
+                        "Read replicas per shard",
+                        "Disable cache and read primary only",
+                        "Duplicate writes to every shard synchronously"
+                    ],
+                    "correct_answer": "Read replicas per shard",
+                    "explanation": "Read replicas serve cache-miss lookups from eventually consistent copies, preserving primary write headroom.",
+                    "uml_mutation": "    db --> replica[(Read Replicas)]\n    svc --> replica\n",
+                    "health_impact": { "availability": 5, "latency": -12, "cost": 8 }
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Id Generation",
+                    "type": "radio",
+                    "text": "Short codes must be unique at global scale without coordination hotspots. Which approach avoids a central counter bottleneck?",
+                    "choices": [
+                        "Snowflake / base62 encoded distributed IDs",
+                        "Auto-increment integer on one MySQL primary",
+                        "Random 3-letter strings with no collision handling"
+                    ],
+                    "correct_answer": "Snowflake / base62 encoded distributed IDs",
+                    "explanation": "Distributed ID generation produces unique, dense keys without a single global sequence coordinator.",
+                    "uml_mutation": "    svc --> idgen[ID Generator]\n    idgen --> db\n",
+                    "health_impact": { "availability": 6, "latency": -5, "cost": 3 }
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: Observability & Resilience",
+            "description": "Close the loop with monitoring, rate limiting, and graceful degradation under chaos.",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Rate Limiting",
+                    "type": "radio",
+                    "text": "A abusive client floods the create-URL endpoint. Where should rate limiting be enforced to protect the whole system?",
+                    "choices": [
+                        "At the API Gateway before services",
+                        "Only inside the database",
+                        "Nowhere — rely on hope"
+                    ],
+                    "correct_answer": "At the API Gateway before services",
+                    "explanation": "Edge rate limiting stops bad traffic before it consumes downstream compute, cache, and database capacity.",
+                    "uml_mutation": "    api --> ratelimit[Rate Limiter]\n    ratelimit --> svc\n",
+                    "health_impact": { "availability": 10, "latency": -3, "cost": 1 }
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Observability",
+                    "type": "radio",
+                    "text": "During an incident you must trace a redirect across CDN, service, cache, and DB. What infrastructure supports that?",
+                    "choices": [
+                        "Centralized logging + distributed tracing (e.g. Prometheus + Jaeger)",
+                        "SSH into each server and tail logs manually",
+                        "Print statements in production only"
+                    ],
+                    "correct_answer": "Centralized logging + distributed tracing (e.g. Prometheus + Jaeger)",
+                    "explanation": "Unified observability correlates requests across tiers, shrinking mean time to recovery during outages.",
+                    "uml_mutation": "    svc --> obs[Metrics & Tracing]\n    api --> obs\n",
+                    "health_impact": { "availability": 8, "latency": 0, "cost": 4 }
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "Graceful Degradation",
+                    "type": "radio",
+                    "text": "The analytics worker falls behind but redirects must keep working. What is the correct degradation strategy?",
+                    "choices": [
+                        "Serve redirects from cache/DB; buffer analytics asynchronously with back-pressure",
+                        "Return HTTP 503 for all redirects until analytics catches up",
+                        "Drop redirect traffic entirely"
+                    ],
+                    "correct_answer": "Serve redirects from cache/DB; buffer analytics asynchronously with back-pressure",
+                    "explanation": "Critical user paths stay available while non-critical analytics lag safely in the queue with back-pressure controls.",
+                    "uml_mutation": "    queue -.->|back-pressure| worker\n    style cdn fill:#065f46,stroke:#34d399\n    style db fill:#065f46,stroke:#34d399\n",
+                    "health_impact": { "availability": 15, "latency": -5, "cost": 2 }
+                }
+            ]
+        }
+    ]
+}

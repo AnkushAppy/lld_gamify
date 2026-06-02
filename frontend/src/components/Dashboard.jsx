@@ -1,4 +1,25 @@
-function TrackCard({ track, onSelect }) {
+const DISCIPLINE_COPY = {
+  lld: {
+    heading: "LLD Blueprint Assembly",
+    description:
+      "Pick a system design track. Answer questions to build the UML class diagram piece by piece.",
+    accent: "text-orange-400 group-hover:text-orange-300",
+    ring: "focus-visible:ring-orange-500",
+    borderHover: "hover:border-orange-500/70 hover:shadow-orange-950/20",
+  },
+  hld: {
+    heading: "HLD Infrastructure Assembly",
+    description:
+      "Pick a distributed systems track. Place components and watch availability, latency, and cost respond to your choices.",
+    accent: "text-sky-400 group-hover:text-sky-300",
+    ring: "focus-visible:ring-sky-500",
+    borderHover: "hover:border-sky-500/70 hover:shadow-sky-950/20",
+  },
+};
+
+function TrackCard({ track, discipline, onSelect }) {
+  const copy = DISCIPLINE_COPY[discipline];
+
   if (!track.available) {
     return (
       <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-6 opacity-60">
@@ -16,14 +37,12 @@ function TrackCard({ track, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(track.system_id)}
-      className="group flex h-full w-full flex-col rounded-xl border border-slate-800 bg-slate-900 p-6 text-left shadow-xl transition-all hover:-translate-y-0.5 hover:border-orange-500/70 hover:shadow-orange-950/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+      className={`group flex h-full w-full flex-col rounded-xl border border-slate-800 bg-slate-900 p-6 text-left shadow-xl transition-all hover:-translate-y-0.5 ${copy.borderHover} focus:outline-none focus-visible:ring-2 ${copy.ring}`}
     >
       <div className="mb-3 text-3xl">{track.icon}</div>
-      <h3 className="mb-2 text-lg font-bold text-slate-100 group-hover:text-orange-100">
-        {track.title}
-      </h3>
+      <h3 className="mb-2 text-lg font-bold text-slate-100">{track.title}</h3>
       <p className="mb-6 flex-1 text-sm leading-relaxed text-slate-400">{track.tagline}</p>
-      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-orange-400 transition-colors group-hover:text-orange-300">
+      <span className={`inline-flex items-center gap-1.5 text-sm font-semibold ${copy.accent}`}>
         Start track
         <svg
           aria-hidden="true"
@@ -40,7 +59,16 @@ function TrackCard({ track, onSelect }) {
   );
 }
 
-export default function Dashboard({ tracks, onSelect, loading, error }) {
+export default function Dashboard({
+  discipline,
+  tracks,
+  onSelect,
+  onBack,
+  loading,
+  error,
+}) {
+  const copy = DISCIPLINE_COPY[discipline];
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-300">
@@ -62,14 +90,17 @@ export default function Dashboard({ tracks, onSelect, loading, error }) {
   return (
     <div className="min-h-screen bg-slate-950 p-8 font-sans text-slate-100">
       <div className="mx-auto max-w-5xl">
+        <button
+          type="button"
+          onClick={onBack}
+          className="mb-6 text-sm text-slate-500 transition-colors hover:text-slate-300"
+        >
+          ← Back to disciplines
+        </button>
+
         <header className="mb-10">
-          <h1 className="mb-2 bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-4xl font-black text-transparent">
-            LLD Blueprint Assembly
-          </h1>
-          <p className="max-w-xl text-slate-400">
-            Pick a system design track. Answer questions to build the UML diagram
-            piece by piece.
-          </p>
+          <h1 className="mb-2 text-4xl font-black text-slate-100">{copy.heading}</h1>
+          <p className="max-w-xl text-slate-400">{copy.description}</p>
           {availableCount > 0 && (
             <p className="mt-2 text-xs text-slate-500">
               {availableCount} track{availableCount === 1 ? "" : "s"} ready
@@ -79,7 +110,12 @@ export default function Dashboard({ tracks, onSelect, loading, error }) {
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {tracks.map((track) => (
-            <TrackCard key={track.system_id} track={track} onSelect={onSelect} />
+            <TrackCard
+              key={track.system_id}
+              track={track}
+              discipline={discipline}
+              onSelect={onSelect}
+            />
           ))}
         </div>
       </div>

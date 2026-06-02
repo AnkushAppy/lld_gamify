@@ -14,7 +14,8 @@ function ensureMermaid() {
   }
 }
 
-export default function DiagramCanvas({ source }) {
+export default function DiagramCanvas({ source, variant = "lld" }) {
+  const isHld = variant === "hld";
   const containerRef = useRef(null);
   const renderId = useId().replace(/:/g, "");
 
@@ -49,7 +50,11 @@ export default function DiagramCanvas({ source }) {
     <div className="space-y-4">
       <div
         ref={containerRef}
-        className="min-h-[360px] w-full flex items-center justify-center overflow-x-auto rounded-xl border border-slate-800 bg-slate-950 p-6"
+        className={`min-h-[360px] w-full flex items-center justify-center overflow-x-auto rounded-xl border p-6 ${
+          isHld
+            ? "border-sky-900/40 bg-slate-950/80"
+            : "border-slate-800 bg-slate-950"
+        }`}
       />
       <details className="rounded-lg border border-slate-800 bg-slate-950 p-3">
         <summary className="cursor-pointer text-sm text-slate-400">

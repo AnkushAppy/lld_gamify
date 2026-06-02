@@ -1,21 +1,22 @@
 import json
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.canvas_engine import init_canvas
+from backend.hld_canvas_engine import init_hld_canvas
 
 CONTENT_DIR = Path(os.environ.get("CONTENT_DIR", "content"))
-TRACKS_MANIFEST = CONTENT_DIR / "tracks.json"
+DISCIPLINES = ("lld", "hld")
 
 app = FastAPI(
-    title="LLD Speedrun Gamifier API",
+    title="LLD/HLD Speedrun Gamifier API",
     description="REST API for Blueprint Assembly game validation.",
-    version="3.1.0",
+    version="4.0.0",
 )
 
 app.add_middleware(
@@ -41,6 +42,7 @@ class ValidationResult(BaseModel):
     explanation: str
     uml_mutation: str
     skill_tag: str
+    health_impact: dict[str, int] | None = None
 
 
 def _discover_config_paths() -> dict[str, Path]:
@@ -48,13 +50,35 @@ def _discover_config_paths() -> dict[str, Path]:
     if not CONTENT_DIR.exists():
         return discovered
 
+    for discipline in DISCIPLINES:
+        discipline_dir = CONTENT_DIR / discipline
+        if not discipline_dir.is_dir():
+            continue
+        for folder in discipline_dir.iterdir():
+            if not folder.is_dir():
+                continue
+            config_path = folder / "quiz_config.json"
+            if config_path.exists():
+                discovered[folder.name] = config_path
+
+    # Legacy flat layout: content/<system_id>/quiz_config.json
     for folder in CONTENT_DIR.iterdir():
-        if not folder.is_dir():
+        if not folder.is_dir() or folder.name in DISCIPLINES:
             continue
         config_path = folder / "quiz_config.json"
         if config_path.exists():
             discovered[folder.name] = config_path
+
     return discovered
+
+
+def _config_discipline(config: dict[str, Any], config_path: Path | None = None) -> str:
+    discipline = config.get("discipline", "lld")
+    if discipline in DISCIPLINES:
+        return discipline
+    if config_path and config_path.parent.parent.name in DISCIPLINES:
+        return config_path.parent.parent.name
+    return "lld"
 
 
 def _load_config(system_id: str) -> dict[str, Any]:
@@ -69,15 +93,20 @@ def _load_config(system_id: str) -> dict[str, Any]:
     with config_path.open(encoding="utf-8") as f:
         config = json.load(f)
 
+    config["_config_path"] = str(config_path)
+    if "discipline" not in config:
+        config["discipline"] = _config_discipline(config, config_path)
+
     _config_cache[system_id] = config
     return config
 
 
-def _load_tracks_manifest() -> list[dict[str, Any]]:
-    if not TRACKS_MANIFEST.exists():
+def _load_tracks_manifest(discipline: str) -> list[dict[str, Any]]:
+    manifest_path = CONTENT_DIR / discipline / "tracks.json"
+    if not manifest_path.exists():
         return []
 
-    with TRACKS_MANIFEST.open(encoding="utf-8") as f:
+    with manifest_path.open(encoding="utf-8") as f:
         payload = json.load(f)
 
     return payload.get("tracks", [])
@@ -106,12 +135,21 @@ def _sanitize_question(question: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _initial_canvas_for(config: dict[str, Any]) -> str:
+    if config.get("discipline") == "hld":
+        return init_hld_canvas()
+    return init_canvas()
+
+
 def _sanitize_config(config: dict[str, Any]) -> dict[str, Any]:
+    discipline = config.get("discipline", "lld")
     total_questions = sum(len(level["questions"]) for level in config["levels"])
-    return {
+    payload: dict[str, Any] = {
         "system_id": config["system_id"],
         "system_title": config["system_title"],
-        "initial_canvas": init_canvas(),
+        "discipline": discipline,
+        "canvas_type": config.get("canvas_type", "flowchart" if discipline == "hld" else "classDiagram"),
+        "initial_canvas": _initial_canvas_for(config),
         "total_levels": len(config["levels"]),
         "total_questions": total_questions,
         "levels": [
@@ -124,6 +162,9 @@ def _sanitize_config(config: dict[str, Any]) -> dict[str, Any]:
             for level in config["levels"]
         ],
     }
+    if discipline == "hld" and config.get("chaos_scenario"):
+        payload["chaos_scenario"] = config["chaos_scenario"]
+    return payload
 
 
 @app.get("/api/health")
@@ -132,10 +173,10 @@ def health():
 
 
 @app.get("/api/systems")
-def list_systems():
-    """Return dashboard track cards; available only when quiz config exists."""
+def list_systems(discipline: Literal["lld", "hld"] = Query("lld")):
+    """Return dashboard track cards for a discipline."""
     discovered = _discover_config_paths()
-    manifest = _load_tracks_manifest()
+    manifest = _load_tracks_manifest(discipline)
 
     if manifest:
         tracks = []
@@ -145,29 +186,34 @@ def list_systems():
             tracks.append(
                 {
                     "system_id": system_id,
+                    "discipline": discipline,
                     "icon": track.get("icon", "📦"),
                     "title": track.get("title", system_id),
                     "tagline": track.get("tagline", ""),
                     "available": has_config and track.get("available", True),
                 }
             )
-        return {"tracks": tracks}
+        return {"discipline": discipline, "tracks": tracks}
 
     tracks = []
     for system_id, path in discovered.items():
         with path.open(encoding="utf-8") as f:
             config = json.load(f)
+        config_discipline = _config_discipline(config, path)
+        if config_discipline != discipline:
+            continue
         first_level = config["levels"][0] if config.get("levels") else {}
         tracks.append(
             {
                 "system_id": system_id,
+                "discipline": discipline,
                 "icon": "📦",
                 "title": config.get("system_title", system_id),
                 "tagline": first_level.get("description", ""),
                 "available": True,
             }
         )
-    return {"tracks": tracks}
+    return {"discipline": discipline, "tracks": tracks}
 
 
 @app.get("/api/game/start/{system_id}")
@@ -198,10 +244,15 @@ def validate_answer(submission: AnswerSubmission):
     config = _load_config(submission.system_id)
     question = _find_question(config, submission.level_index, submission.question_id)
     is_correct = submission.selected_answer == question["correct_answer"]
+    health_impact = None
+
+    if is_correct and config.get("discipline") == "hld":
+        health_impact = question.get("health_impact")
 
     return ValidationResult(
         is_correct=is_correct,
         explanation=question["explanation"],
         uml_mutation=question["uml_mutation"] if is_correct else "",
         skill_tag=question["skill_tag"],
+        health_impact=health_impact,
     )

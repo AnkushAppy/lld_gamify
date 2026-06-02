@@ -2,8 +2,8 @@ import axios from "axios";
 
 const api = axios.create({ baseURL: "/api" });
 
-export async function fetchSystems() {
-  const { data } = await api.get("/systems");
+export async function fetchSystems(discipline = "lld") {
+  const { data } = await api.get("/systems", { params: { discipline } });
   return data.tracks;
 }
 
@@ -12,7 +12,12 @@ export async function startGame(systemId) {
   return data;
 }
 
-export async function validateAnswer(systemId, levelIndex, questionId, selectedAnswer) {
+export async function validateAnswer(
+  systemId,
+  levelIndex,
+  questionId,
+  selectedAnswer,
+) {
   const { data } = await api.post("/game/validate", {
     system_id: systemId,
     level_index: levelIndex,

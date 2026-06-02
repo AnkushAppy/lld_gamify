@@ -1,0 +1,226 @@
+{
+    "system_id": "taxi_booking_hld",
+    "discipline": "hld",
+    "canvas_type": "flowchart",
+    "system_title": "Taxi Booking Engine — High-Level Architecture",
+    "chaos_scenario": {
+        "title": "Simulating New Year's Eve Surge (100x Load)...",
+        "success_badge": "Master Mobility Architect",
+        "steps": [
+            { "label": "Millions of real-time WebSocket pings absorbed", "status": "ok" },
+            { "label": "Kafka buffers location ingestion safely", "status": "ok" },
+            { "label": "Redis Geospatial queries maintain <50ms SLA", "status": "ok" },
+            { "label": "Async payment retries prevent revenue loss", "status": "ok" }
+        ]
+    },
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Client Ingress & Real-Time Connections",
+            "description": "Establish a highly available entry point that can handle massive concurrent connections from drivers and riders.",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "High Availability",
+                    "type": "radio",
+                    "text": "Millions of riders and drivers are opening the app simultaneously. What is the first infrastructure component required to route this traffic securely across healthy backend servers?",
+                    "choices": [
+                        "A single monolithic Node.js server",
+                        "An API Gateway backed by a Global Load Balancer",
+                        "Direct IP routing to the database"
+                    ],
+                    "correct_answer": "An API Gateway backed by a Global Load Balancer",
+                    "explanation": "An API Gateway handles SSL termination, routing, and horizontal scaling. Paired with a load balancer, it ensures no single point of failure at the entry layer.",
+                    "uml_mutation": "    rider((Rider)) --> api[API Gateway]\n    driver((Driver)) --> api\n",
+                    "health_impact": { "availability": 10, "latency": -5, "cost": 3 }
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "Latency Optimization",
+                    "type": "radio",
+                    "text": "Drivers send their GPS location every 3 seconds. Establishing a new HTTP connection for every ping introduces massive overhead. What protocol is better suited for this?",
+                    "choices": [
+                        "Persistent WebSockets / Long-lived TCP connections",
+                        "FTP (File Transfer Protocol)",
+                        "Standard HTTP/1.1 REST calls"
+                    ],
+                    "correct_answer": "Persistent WebSockets / Long-lived TCP connections",
+                    "explanation": "WebSockets maintain a persistent, bi-directional connection, drastically reducing hand-shake overhead and latency for high-frequency location streaming.",
+                    "uml_mutation": "    api --> ws[WebSocket Cluster]\n",
+                    "health_impact": { "availability": 5, "latency": -35, "cost": 6 }
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "Fault Tolerance",
+                    "type": "radio",
+                    "text": "Malicious bots occasionally flood the entry point attempting to scrape pricing data or exhaust resources. How do we protect the backend?",
+                    "choices": [
+                        "Web Application Firewall (WAF) & Rate Limiter at the API Gateway",
+                        "Manually blocking IPs in the database",
+                        "Closing the WebSocket connections randomly"
+                    ],
+                    "correct_answer": "Web Application Firewall (WAF) & Rate Limiter at the API Gateway",
+                    "explanation": "A WAF and rate limiter intercept bad traffic at the edge, protecting expensive downstream compute resources from DDoS attacks and abuse.",
+                    "uml_mutation": "    api --> waf[WAF & Rate Limiter]\n    waf --> ws\n",
+                    "health_impact": { "availability": 12, "latency": -2, "cost": 4 }
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Location Tracking & Matchmaking",
+            "description": "Ingest high-throughput data streams and architect fast spatial querying for dispatching.",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Async Processing",
+                    "type": "radio",
+                    "text": "The WebSocket cluster receives millions of GPS pings per second. If we write these directly to a database, it will crash. How do we buffer this write-heavy workload?",
+                    "choices": [
+                        "Write them to local text files on the WebSocket servers",
+                        "Use a high-throughput message queue like Apache Kafka",
+                        "Pause driver connections until the database catches up"
+                    ],
+                    "correct_answer": "Use a high-throughput message queue like Apache Kafka",
+                    "explanation": "Kafka acts as a shock absorber. It durably ingests millions of events per second and decouples the ingestion layer from the workers processing the locations.",
+                    "uml_mutation": "    ws --> kafka[[Kafka Event Stream]]\n",
+                    "health_impact": { "availability": 15, "latency": -10, "cost": 8 }
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "Data Partitioning",
+                    "type": "radio",
+                    "text": "To dispatch a ride, the system must instantly find all drivers within a 2-mile radius. Which storage technology and indexing strategy provides the lowest latency for this?",
+                    "choices": [
+                        "An in-memory Geospatial index (e.g., Redis Geo / QuadTree / H3)",
+                        "A standard relational table doing full-table scans",
+                        "HDFS (Hadoop Distributed File System)"
+                    ],
+                    "correct_answer": "An in-memory Geospatial index (e.g., Redis Geo / QuadTree / H3)",
+                    "explanation": "In-memory geospatial databases divide the world into spatial grids (like Geohashes or H3), allowing O(1) or O(log N) lookups for nearby drivers instead of scanning all users.",
+                    "uml_mutation": "    kafka --> locSvc[Location Service]\n    locSvc --> redis[(Redis Geospatial)]\n",
+                    "health_impact": { "availability": 8, "latency": -40, "cost": 10 }
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Scalability",
+                    "type": "radio",
+                    "text": "Now that we know where drivers are, a rider requests a trip. Which microservice coordinates querying the Location Service and pushing the offer to the best driver?",
+                    "choices": [
+                        "The Matchmaking / Dispatch Service",
+                        "The API Gateway itself",
+                        "The Driver's mobile phone"
+                    ],
+                    "correct_answer": "The Matchmaking / Dispatch Service",
+                    "explanation": "A dedicated Dispatch Service contains the complex business logic to evaluate ETA, driver scores, and route the ride offer to the most optimal candidate via the WebSocket connection.",
+                    "uml_mutation": "    api --> dispatch[Dispatch Service]\n    dispatch --> locSvc\n    dispatch -.->|Offer Ride| ws\n",
+                    "health_impact": { "availability": 10, "latency": -5, "cost": 5 }
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Trip Management & Data Persistence",
+            "description": "Manage long-running state machines and persist data accurately across different database paradigms.",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Data Consistency",
+                    "type": "radio",
+                    "text": "Once a driver accepts, the ride moves through states (Arrived, In Transit, Completed). Which service is responsible for this state machine?",
+                    "choices": [
+                        "Trip Management Service",
+                        "Location Service",
+                        "Global Load Balancer"
+                    ],
+                    "correct_answer": "Trip Management Service",
+                    "explanation": "The Trip Management Service orchestrates the lifecycle of a ride, acting as the source of truth for the current state of any active booking.",
+                    "uml_mutation": "    dispatch --> tripSvc[Trip Management Service]\n",
+                    "health_impact": { "availability": 5, "latency": -2, "cost": 4 }
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Scalability",
+                    "type": "radio",
+                    "text": "Completed trips generate massive amounts of historical data, which is mostly queried by Trip ID or User ID. What database paradigm fits this high-write, horizontally scalable workload?",
+                    "choices": [
+                        "A single monolithic SQLite file",
+                        "A distributed NoSQL database (e.g., Cassandra / DynamoDB)",
+                        "A Redis Cache with an eviction policy"
+                    ],
+                    "correct_answer": "A distributed NoSQL database (e.g., Cassandra / DynamoDB)",
+                    "explanation": "Wide-column or Key-Value NoSQL databases like Cassandra are optimized for massive write throughput and allow seamless horizontal scaling by partitioning data across many nodes.",
+                    "uml_mutation": "    tripSvc --> cassandra[(Trip DB / Cassandra)]\n",
+                    "health_impact": { "availability": 12, "latency": -5, "cost": 15 }
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Data Consistency",
+                    "type": "radio",
+                    "text": "When the trip ends, the user's credit card is charged. Payment data requires strict ACID compliance (Atomicity, Consistency, Isolation, Durability). What database is best?",
+                    "choices": [
+                        "A Relational SQL Database (e.g., PostgreSQL / MySQL)",
+                        "A graph database like Neo4j",
+                        "Kafka Event Stream"
+                    ],
+                    "correct_answer": "A Relational SQL Database (e.g., PostgreSQL / MySQL)",
+                    "explanation": "Relational databases provide strict ACID guarantees, which are legally and financially required to ensure no double-charges or lost financial transactions.",
+                    "uml_mutation": "    tripSvc --> paySvc[Payment Service]\n    paySvc --> pgsql[(Payment DB / PostgreSQL)]\n",
+                    "health_impact": { "availability": 8, "latency": -2, "cost": 7 }
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: Streaming Analytics & Resilience",
+            "description": "Implement dynamic surge pricing, handle external failures gracefully, and monitor system health.",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Async Processing",
+                    "type": "radio",
+                    "text": "To calculate Surge Pricing, we need to analyze supply (driver pings) and demand (app opens) in real-time. How should we process this data?",
+                    "choices": [
+                        "Run a nightly batch job on the database",
+                        "Use a Stream Processing Engine (e.g., Apache Flink / Spark Streaming) reading from Kafka",
+                        "Have the Dispatch Service calculate it synchronously on every request"
+                    ],
+                    "correct_answer": "Use a Stream Processing Engine (e.g., Apache Flink / Spark Streaming) reading from Kafka",
+                    "explanation": "Stream processing engines consume events from Kafka in real-time, compute aggregations (like demand heatmaps) over sliding time windows, and update surge multipliers instantly.",
+                    "uml_mutation": "    kafka --> flink[Stream Processing (Flink)]\n    flink --> pricing[Surge Pricing Service]\n    dispatch --> pricing\n",
+                    "health_impact": { "availability": 7, "latency": -15, "cost": 12 }
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Fault Tolerance",
+                    "type": "radio",
+                    "text": "External payment gateways (like Stripe) sometimes go down. How do we ensure we don't lose the payment data if the charge fails due to a network error?",
+                    "choices": [
+                        "Show the driver an error and tell them they won't be paid",
+                        "Use an async Dead Letter Queue (DLQ) to retry failed payments with exponential backoff",
+                        "Restart the Trip Management Service"
+                    ],
+                    "correct_answer": "Use an async Dead Letter Queue (DLQ) to retry failed payments with exponential backoff",
+                    "explanation": "A Retry Queue/DLQ durably stores failed tasks. Workers can retry processing the payment later when the third-party gateway recovers, ensuring eventual consistency.",
+                    "uml_mutation": "    paySvc --> dlq[[Retry & DLQ Kafka]]\n    dlq -.->|Backoff Retry| paySvc\n",
+                    "health_impact": { "availability": 15, "latency": 0, "cost": 3 }
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "Observability",
+                    "type": "radio",
+                    "text": "During a New Year's Eve surge, you need to track how long a request takes jumping from the API, to Dispatch, to Trip Service. What infrastructure solves this?",
+                    "choices": [
+                        "Distributed Tracing (e.g., Jaeger / OpenTelemetry)",
+                        "Printing the time to standard output (stdout)",
+                        "Using ping commands in the terminal"
+                    ],
+                    "correct_answer": "Distributed Tracing (e.g., Jaeger / OpenTelemetry)",
+                    "explanation": "Distributed tracing attaches a unique Correlation ID to the request at the gateway, tracing its path and latency across all microservices to pinpoint bottlenecks.",
+                    "uml_mutation": "    api --> obs[Observability Platform]\n    dispatch --> obs\n    tripSvc --> obs\n    style kafka fill:#065f46,stroke:#34d399\n    style redis fill:#065f46,stroke:#34d399\n",
+                    "health_impact": { "availability": 10, "latency": 0, "cost": 5 }
+                }
+            ]
+        }
+    ]
+}

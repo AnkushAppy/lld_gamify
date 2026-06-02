@@ -1,23 +1,30 @@
 import { useEffect, useState } from "react";
 import { fetchSystems, startGame } from "./api.js";
 import Dashboard from "./components/Dashboard.jsx";
-import GameScreen from "./components/GameScreen.jsx";
+import HldGameScreen from "./components/HldGameScreen.jsx";
+import LldGameScreen from "./components/LldGameScreen.jsx";
+import ModeSelector from "./components/ModeSelector.jsx";
 
 export default function App() {
+  const [discipline, setDiscipline] = useState(null);
   const [tracks, setTracks] = useState([]);
   const [selectedSystemId, setSelectedSystemId] = useState(null);
   const [config, setConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchSystems()
+    if (!discipline) return undefined;
+
+    setLoading(true);
+    setError("");
+    fetchSystems(discipline)
       .then(setTracks)
       .catch(() =>
         setError("Failed to load tracks. Is the API running on port 8000?"),
       )
       .finally(() => setLoading(false));
-  }, []);
+  }, [discipline]);
 
   async function handleSelectTrack(systemId) {
     setLoading(true);
@@ -33,27 +40,49 @@ export default function App() {
     }
   }
 
-  function handleQuit() {
+  function handleQuitGame() {
     setSelectedSystemId(null);
     setConfig(null);
   }
 
+  function handleBackToDisciplines() {
+    setDiscipline(null);
+    setTracks([]);
+    setError("");
+  }
+
   if (selectedSystemId && config) {
+    if (config.discipline === "hld") {
+      return (
+        <HldGameScreen
+          systemId={selectedSystemId}
+          config={config}
+          onQuit={handleQuitGame}
+        />
+      );
+    }
+
     return (
-      <GameScreen
+      <LldGameScreen
         systemId={selectedSystemId}
         config={config}
-        onQuit={handleQuit}
+        onQuit={handleQuitGame}
       />
     );
   }
 
-  return (
-    <Dashboard
-      tracks={tracks}
-      onSelect={handleSelectTrack}
-      loading={loading}
-      error={error}
-    />
-  );
+  if (discipline) {
+    return (
+      <Dashboard
+        discipline={discipline}
+        tracks={tracks}
+        onSelect={handleSelectTrack}
+        onBack={handleBackToDisciplines}
+        loading={loading}
+        error={error}
+      />
+    );
+  }
+
+  return <ModeSelector onSelect={setDiscipline} />;
 }
