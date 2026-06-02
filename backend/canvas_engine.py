@@ -14,7 +14,6 @@ def init_canvas() -> str:
 
 
 def _normalize_empty_class(mutation: str) -> str:
-    """Mermaid rejects empty braces — use bare class declaration instead."""
     return re.sub(
         r"class\s+(\w+)\s*\{\s*\}",
         r"class \1",
@@ -23,7 +22,6 @@ def _normalize_empty_class(mutation: str) -> str:
 
 
 def _extract_class_block(text: str) -> tuple[str, str, str] | None:
-    """Return (class_name, full_block, remainder) if text starts with a class block."""
     match = re.match(r"class\s+(\w+)\s*\{", text)
     if not match:
         bare = re.match(r"class\s+(\w+)\s*(?:\n|$)", text)
@@ -66,7 +64,6 @@ def _append_line(canvas: str, line: str) -> str:
 
 
 def apply_mutation(canvas: str, mutation: str) -> str:
-    """Merge a uml_mutation into the canvas (replace classes, append relationships)."""
     if not mutation or not mutation.strip():
         return canvas
 
