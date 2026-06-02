@@ -1,0 +1,216 @@
+{
+    "system_id": "parking_lot_blueprint",
+    "system_title": "Next-Gen Parking Lot LLD Speedrun",
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Core Entity Definition & Encapsulation",
+            "description": "Isolate leaf domain objects, control state tracking metrics, and enforce strict structural visibility rules based on Domain-Driven Design principles.",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "In a Parking Lot system, which core domain object represents a customer's immutable proof of entry and acts as a central 'Value Object' tracking temporal lifecycle bounds?",
+                    "choices": [
+                        "ParkingTicket",
+                        "DatabaseLoggerService",
+                        "TicketIdString"
+                    ],
+                    "correct_answer": "ParkingTicket",
+                    "explanation": "A ParkingTicket is a first-class Domain Entity. Unlike stateless utility services or primitive strings, it possesses a continuous temporal lifecycle, domain-specific behavior, and a distinct identity tracked via a unique identifier.",
+                    "uml_mutation": "class ParkingTicket\n"
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "Attribute Visibility",
+                    "type": "radio",
+                    "text": "The entry timestamp 'issuedAt' must be globally readable for fee calculation but strictly protected against post-issuance mutations (tampering). Which visibility and access strategy guarantees this invariant?",
+                    "choices": [
+                        "+ LocalDateTime issuedAt (Public field, directly accessed)",
+                        "- LocalDateTime issuedAt (Private field with getter, no setter)",
+                        "# LocalDateTime issuedAt (Protected field, allowing subclass mutations)"
+                    ],
+                    "correct_answer": "- LocalDateTime issuedAt (Private field with getter, no setter)",
+                    "explanation": "Private visibility (-) combined with an explicit accessor (getter) and the omission of a mutator (setter) ensures runtime immutability, preventing unauthorized state modification after object instantiation.",
+                    "uml_mutation": "class ParkingTicket {\n    -String ticketNumber\n    -LocalDateTime issuedAt\n    +getIssuedAt() : LocalDateTime\n}\n"
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "State Modeling",
+                    "type": "radio",
+                    "text": "The parking ticket shifts through specific states (ACTIVE, PAID, LOST). What is the safest architectural structure to prevent invalid state injections (like 'PENDNG' instead of 'PENDING') into our domain framework?",
+                    "choices": [
+                        "A flexible String variable named 'status'",
+                        "An integer status code variable (e.g., 0, 1, 2) mapped in documentation",
+                        "A dedicated TicketStatus Enumeration"
+                    ],
+                    "correct_answer": "A dedicated TicketStatus Enumeration",
+                    "explanation": "Enums enforce compile-time type safety. They constrain the domain state space to an explicit pool of valid options, wiping out systemic typo errors, integer misinterpretations, and invalid state transitions.",
+                    "uml_mutation": "class TicketStatus {\n    <<enumeration>>\n    ACTIVE\n    PAID\n    LOST\n}\n"
+                },
+                {
+                    "question_id": "l1_q4",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "Link your newly created TicketStatus enumeration to the ParkingTicket class. What relationship accurately characterizes this structural connection?",
+                    "choices": [
+                        "ParkingTicket inherits from TicketStatus (Generalization)",
+                        "ParkingTicket holds a directional association to TicketStatus (Association)",
+                        "TicketStatus contains a list of ParkingTickets (Composition)"
+                    ],
+                    "correct_answer": "ParkingTicket holds a directional association to TicketStatus (Association)",
+                    "explanation": "A ParkingTicket has an attribute containing a TicketStatus value. This represents a directed structural association where the ticket points to its current state definition.",
+                    "uml_mutation": "ParkingTicket --> TicketStatus : maintains_state\n"
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Structural Relations & Multiplicity Mapping",
+            "description": "Establish multi-element containment boundaries, differentiate between Aggregation and Composition, and introduce polymorphic domain foundations.",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "A ParkingFloor contains multiple ParkingSlots. If a ParkingFloor is structurally demolished, its corresponding ParkingSlots cease to exist. How is this strictly enforced in UML?",
+                    "choices": [
+                        "Composition (Filled black diamond from ParkingFloor to ParkingSlot)",
+                        "Aggregation (Hollow diamond from ParkingFloor to ParkingSlot)",
+                        "Realization (Dotted line with hollow triangle)"
+                    ],
+                    "correct_answer": "Composition (Filled black diamond from ParkingFloor to ParkingSlot)",
+                    "explanation": "Composition (filled diamond) models a 'whole-part' relationship with strict lifecycle dependency. Since slots are physically bound to the floor, they cannot exist independently if the floor is destroyed.",
+                    "uml_mutation": "class ParkingFloor {\n    -String floorId\n}\nclass ParkingSlot {\n    -String slotId\n    -boolean isAvailable\n}\nParkingFloor \"1\" *-- \"*\" ParkingSlot : contains_slots\n"
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "When a Vehicle parks in a ParkingSlot, the slot holds a reference to the vehicle. However, when the vehicle leaves, the slot remains. What relationship defines this temporary containment?",
+                    "choices": [
+                        "Composition",
+                        "Aggregation",
+                        "Generalization"
+                    ],
+                    "correct_answer": "Aggregation",
+                    "explanation": "Aggregation (hollow diamond) represents a 'has-a' relationship where the child (Vehicle) can exist independently of the parent (ParkingSlot). The slot does not own the vehicle's lifecycle.",
+                    "uml_mutation": "class Vehicle {\n    -String licensePlate\n}\nParkingSlot o-- Vehicle : currently_parks\n"
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "Our system must support Cars, Trucks, and Motorcycles. Each requires a different parking spot size. How should we structurally model this to allow dynamic size resolution at runtime?",
+                    "choices": [
+                        "Create separate unrelated classes for Car, Truck, and Motorcycle.",
+                        "Make Vehicle an abstract class with an abstract method getRequiredSpotType(), implemented by concrete subclasses.",
+                        "Add a 'String type' variable to Vehicle and use an if-else chain in the parking assignment logic."
+                    ],
+                    "correct_answer": "Make Vehicle an abstract class with an abstract method getRequiredSpotType(), implemented by concrete subclasses.",
+                    "explanation": "Using an abstract class and polymorphic methods avoids Open-Closed Principle violations. New vehicle types can be added seamlessly by creating new subclasses without modifying existing assignment logic.",
+                    "uml_mutation": "class Vehicle {\n    <<abstract>>\n    -String licensePlate\n    +getRequiredSpotType() : SpotType\n}\nclass Car {\n    +getRequiredSpotType() : SpotType\n}\nclass Truck {\n    +getRequiredSpotType() : SpotType\n}\nVehicle <|-- Car\nVehicle <|-- Truck\n"
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Interface Behaviors & Design Patterns",
+            "description": "Utilize Gang of Four (GoF) design patterns to implement dynamic behaviors, decoupled interactions, and robust method signatures.",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "The lot requires dynamic pricing models (Hourly, Flat Rate, Special Event) that can be swapped at runtime. Which behavioral design pattern is best suited for this?",
+                    "choices": [
+                        "The Singleton Pattern",
+                        "The Strategy Pattern",
+                        "The Decorator Pattern"
+                    ],
+                    "correct_answer": "The Strategy Pattern",
+                    "explanation": "The Strategy Pattern defines a family of algorithms (pricing models), encapsulates each one, and makes them interchangeable. This lets the fee calculation vary independently from the parking lot orchestrator.",
+                    "uml_mutation": "class PricingStrategy {\n    <<interface>>\n    +calculateFee(ticket: ParkingTicket) : double\n}\nclass HourlyPricing {\n    +calculateFee(ticket: ParkingTicket) : double\n}\nPricingStrategy <|.. HourlyPricing\n"
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "Looking at the PricingStrategy interface, why is passing the entire `ParkingTicket` object preferable to passing primitive values like `double hours` and `String vehicleType`?",
+                    "choices": [
+                        "It minimizes memory allocation by avoiding primitive wrappers.",
+                        "It improves flexibility; if a future pricing strategy requires new ticket data (e.g., entry gate ID), the interface signature doesn't need to break.",
+                        "It forces tight coupling, which is desired in domain-driven design."
+                    ],
+                    "correct_answer": "It improves flexibility; if a future pricing strategy requires new ticket data (e.g., entry gate ID), the interface signature doesn't need to break.",
+                    "explanation": "Passing an aggregate context object (the ticket) makes the method signature resilient to future changes (Open-Closed Principle), preventing a cascading interface modification if new parameters are needed.",
+                    "uml_mutation": "class CheckoutProcessor {\n    -PricingStrategy strategy\n    +processPayment(ticket: ParkingTicket)\n}\nCheckoutProcessor --> PricingStrategy : utilizes\n"
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "When a ParkingFloor becomes completely full, an electronic DisplayBoard at the entrance must update immediately. How should the ParkingFloor notify the DisplayBoard while remaining loosely coupled?",
+                    "choices": [
+                        "The ParkingFloor should directly instantiate and call DisplayBoard.update().",
+                        "Run a continuous while-loop thread inside DisplayBoard querying the floor's status.",
+                        "Implement the Observer Pattern: the Floor acts as a Subject, notifying a generic Observer interface implemented by the DisplayBoard."
+                    ],
+                    "correct_answer": "Implement the Observer Pattern: the Floor acts as a Subject, notifying a generic Observer interface implemented by the DisplayBoard.",
+                    "explanation": "The Observer Pattern allows the Subject (ParkingFloor) to broadcast state changes to multiple listeners (DisplayBoards, mobile apps) without depending on their concrete implementations.",
+                    "uml_mutation": "class FloorObserver {\n    <<interface>>\n    +onFloorFull(floorId: String)\n}\nclass DisplayBoard {\n    +onFloorFull(floorId: String)\n}\nFloorObserver <|.. DisplayBoard\nParkingFloor --> FloorObserver : notifies\n"
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: System Orchestration & Concurrency",
+            "description": "Design the main entry point (Facade), manage structural orchestration, and handle thread-safe systemic operations.",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "We need a central orchestrator class to handle external requests (entry, exit) and coordinate internal subsystems (floors, checkout). What architectural pattern best fits this single point of interaction?",
+                    "choices": [
+                        "The Builder Pattern",
+                        "The Facade Pattern (often combined with Singleton)",
+                        "The Proxy Pattern"
+                    ],
+                    "correct_answer": "The Facade Pattern (often combined with Singleton)",
+                    "explanation": "A Facade provides a simplified, high-level interface to a complex subsystem. A central 'ParkingLotController' acts as a Facade, hiding the complexity of slot assignment, ticket generation, and fee calculation from the client.",
+                    "uml_mutation": "class ParkingLotController {\n    -static ParkingLotController instance\n    +getInstance() : ParkingLotController\n}\n"
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "The ParkingLotController manages physical infrastructure. A large lot will have multiple EntryPanels and ExitPanels operating simultaneously. How is this mapped structurally?",
+                    "choices": [
+                        "Controller has exactly one EntryPanel and one ExitPanel (1 to 1).",
+                        "Controller aggregates multiple EntryPanels and ExitPanels (1 to Many).",
+                        "EntryPanels and ExitPanels inherit from the Controller."
+                    ],
+                    "correct_answer": "Controller aggregates multiple EntryPanels and ExitPanels (1 to Many).",
+                    "explanation": "A robust system supports high throughput by deploying multiple entry/exit gates, all reporting to the central controller. A '1 to *' mapping is required.",
+                    "uml_mutation": "class EntryPanel {\n    -String panelId\n}\nclass ExitPanel {\n    -String panelId\n}\nParkingLotController \"1\" o-- \"*\" EntryPanel : coordinates\nParkingLotController \"1\" o-- \"*\" ExitPanel : coordinates\nParkingLotController \"1\" *-- \"*\" ParkingFloor : manages\n"
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "When two cars arrive at different EntryPanels at the exact same millisecond, they might be assigned the last available ParkingSlot. How should the controller's `assignSlot()` method signature or design account for this?",
+                    "choices": [
+                        "It must return void and use optimistic UI updates.",
+                        "It should be designed as a thread-safe atomic operation (e.g., using synchronized blocks or concurrent locks on the slot pool) before returning the assigned ParkingSlot.",
+                        "It should pass the Vehicle object directly to the database without validation."
+                    ],
+                    "correct_answer": "It should be designed as a thread-safe atomic operation (e.g., using synchronized blocks or concurrent locks on the slot pool) before returning the assigned ParkingSlot.",
+                    "explanation": "In distributed or multi-threaded LLD systems, managing shared resources (available slots) requires mutual exclusion (locking) to prevent race conditions and overbooking.",
+                    "uml_mutation": "class ParkingLotController {\n    +assignSlot(v: Vehicle) : ParkingSlot\n    +processEntry(v: Vehicle, panelId: String) : ParkingTicket\n    +processExit(ticket: ParkingTicket, panelId: String) : Receipt\n}\n"
+                }
+            ]
+        }
+    ]
+}

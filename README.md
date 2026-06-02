@@ -67,4 +67,18 @@ See [PRD §7](docs/PRD.md#7-scope-boundaries-out-of-scope-for-mvp) for full scop
 
 ## Status
 
-**Phase 1 — Documentation.** Implementation has not started yet.
+**Phase 2 — Implementation.** Unified FastAPI + Gradio app is runnable.
+
+### Quick start
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
+
+- **Game UI:** http://127.0.0.1:8000/
+- **API docs:** http://127.0.0.1:8000/docs
+
+Game content lives at `content/parking_lot_blueprint/quiz_config.json`. Override with `QUIZ_CONFIG_PATH`.
