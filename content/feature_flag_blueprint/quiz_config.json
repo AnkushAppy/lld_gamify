@@ -1,0 +1,202 @@
+{
+    "system_id": "feature_flag_blueprint",
+    "system_title": "Enterprise Feature Flag Engine LLD",
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Core Entity Definition & Encapsulation",
+            "description": "Establish the foundational domain models for the feature toggle engine, define state constraints, and enforce encapsulation for identifier immutability.",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "In a Feature Flag System, what is the central domain entity that encapsulates the routing logic, lifecycle, and identity of a system toggle?",
+                    "choices": [
+                        "BooleanConfigString",
+                        "FeatureFlag",
+                        "DatabaseRouter"
+                    ],
+                    "correct_answer": "FeatureFlag",
+                    "explanation": "The 'FeatureFlag' is the primary Domain Entity (Aggregate Root). It is not a simple boolean primitive; it possesses an ongoing lifecycle, audit metadata, and encapsulates complex evaluation rules.",
+                    "uml_mutation": "class FeatureFlag\n"
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "State Modeling",
+                    "type": "radio",
+                    "text": "A feature flag can be turned on, turned off, or permanently retired. How should we structurally constrain these states to prevent invalid domain injections?",
+                    "choices": [
+                        "A boolean variable `isLive`. (True for on, False for off)",
+                        "An integer flag where 0=DISABLED, 1=ENABLED, 2=ARCHIVED.",
+                        "A dedicated FlagStatus Enumeration."
+                    ],
+                    "correct_answer": "A dedicated FlagStatus Enumeration.",
+                    "explanation": "A boolean is insufficient because a flag has more than two lifecycle states (e.g., ARCHIVED to indicate tech-debt removal). An Enum ensures compile-time type safety and prevents arbitrary or invalid state transitions.",
+                    "uml_mutation": "class FlagStatus {\n    <<enumeration>>\n    ENABLED\n    DISABLED\n    ARCHIVED\n}\nFeatureFlag --> FlagStatus : current_status\n"
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "Attribute Visibility",
+                    "type": "radio",
+                    "text": "The unique identifier of a flag (e.g., 'new-checkout-ui') is used extensively in application codebases. Once created, it must never change. Which encapsulation strategy enforces this?",
+                    "choices": [
+                        "+ String flagKey (Public field for global read/write)",
+                        "- String flagKey (Private field with a getter, but no setter)",
+                        "# String flagKey (Protected field for subclass manipulation)"
+                    ],
+                    "correct_answer": "- String flagKey (Private field with a getter, but no setter)",
+                    "explanation": "Private visibility coupled with an explicit getter and the absence of a setter enforces runtime immutability, ensuring the `flagKey` remains an invariant identifier throughout the object's lifecycle.",
+                    "uml_mutation": "class FeatureFlag {\n    -String flagKey\n    +getFlagKey() : String\n}\n"
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Structural Relations & Multiplicity Mapping",
+            "description": "Map structural associations between a flag and its targeting rules, and establish polymorphic foundations for dynamic evaluation.",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "A FeatureFlag often contains multiple specific conditions (e.g., 'Only users in Canada', 'Only Beta testers'). If the FeatureFlag is deleted, these rules must also be destroyed. How do we model this strict ownership?",
+                    "choices": [
+                        "Composition (Filled black diamond from FeatureFlag to TargetingRule)",
+                        "Aggregation (Hollow diamond from FeatureFlag to TargetingRule)",
+                        "Dependency (Dotted line from TargetingRule to FeatureFlag)"
+                    ],
+                    "correct_answer": "Composition (Filled black diamond from FeatureFlag to TargetingRule)",
+                    "explanation": "Composition strictly dictates that the parts (TargetingRules) cannot exist without the whole (FeatureFlag). Deleting the flag cascades the deletion to its internal rules.",
+                    "uml_mutation": "class TargetingRule {\n    <<abstract>>\n}\nFeatureFlag \"1\" *-- \"*\" TargetingRule : contains_rules\n"
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "Targeting rules vary greatly (e.g., Percentage Rollout, User ID Matching, Geo-Targeting). To adhere to the Open-Closed Principle, how should we structurally model this?",
+                    "choices": [
+                        "Add a 'String ruleType' variable to TargetingRule and write a massive switch-case statement.",
+                        "Make TargetingRule an abstract class or interface, and inherit specific implementations (e.g., PercentageRule, MatchRule).",
+                        "Put all targeting logic directly inside the FeatureFlag class."
+                    ],
+                    "correct_answer": "Make TargetingRule an abstract class or interface, and inherit specific implementations (e.g., PercentageRule, MatchRule).",
+                    "explanation": "Polymorphism isolates distinct behaviors. By defining an abstract TargetingRule, we can seamlessly introduce new targeting strategies in the future without modifying the core FeatureFlag evaluation logic.",
+                    "uml_mutation": "class PercentageRule {\n    -int rolloutPercentage\n}\nclass UserMatchRule {\n    -String[] targetUserIds\n}\nTargetingRule <|-- PercentageRule\nTargetingRule <|-- UserMatchRule\n"
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "To evaluate a rule, the system needs to know *who* is requesting the feature (User ID, Device Type, Location). How should this dynamic data be passed to the evaluation mechanism?",
+                    "choices": [
+                        "By tightly coupling the FeatureFlag to the global DatabaseSession.",
+                        "By passing an aggregate `EvaluationContext` object containing the request metadata into the evaluation method.",
+                        "By injecting individual primitive strings (`userId`, `country`, `os`) into the FeatureFlag constructor."
+                    ],
+                    "correct_answer": "By passing an aggregate `EvaluationContext` object containing the request metadata into the evaluation method.",
+                    "explanation": "Using a parameter object (`EvaluationContext`) creates a loosely coupled dependency. It prevents breaking the method signature later if new attributes (like 'subscriptionTier') are required for evaluation.",
+                    "uml_mutation": "class EvaluationContext {\n    -String userId\n    -Map attributes\n}\nTargetingRule ..> EvaluationContext : requires\n"
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Interface Behaviors & Design Patterns",
+            "description": "Implement behavioral design patterns to handle complex logical operations and event-driven updates.",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "Based on our polymorphic setup, what is the best method signature to add to the `TargetingRule` abstraction to determine if a rule is satisfied?",
+                    "choices": [
+                        "+evaluate() void",
+                        "+evaluate(EvaluationContext context) boolean",
+                        "+evaluate(String userId, FeatureFlag flag) String"
+                    ],
+                    "correct_answer": "+evaluate(EvaluationContext context) boolean",
+                    "explanation": "The method must return a boolean (True if the rule passes, False otherwise) and take the `EvaluationContext` as input to analyze the user's specific state against the rule's criteria.",
+                    "uml_mutation": "class TargetingRule {\n    +evaluate(EvaluationContext context) : boolean\n}\nclass PercentageRule {\n    +evaluate(EvaluationContext context) : boolean\n}\nclass UserMatchRule {\n    +evaluate(EvaluationContext context) : boolean\n}\n"
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "Sometimes multiple rules must be combined logically (e.g., 'Rule A AND Rule B'). Which structural GoF design pattern allows us to treat a group of rules exactly like a single rule?",
+                    "choices": [
+                        "The Composite Pattern",
+                        "The Facade Pattern",
+                        "The Flyweight Pattern"
+                    ],
+                    "correct_answer": "The Composite Pattern",
+                    "explanation": "The Composite pattern allows you to compose objects into tree structures to represent part-whole hierarchies. A `CompositeRule` implements `TargetingRule` but also contains a list of `TargetingRule`s, allowing deep, recursive logical nesting (AND/OR).",
+                    "uml_mutation": "class CompositeRule {\n    -String logicalOperator\n    +evaluate(EvaluationContext context) : boolean\n}\nTargetingRule <|-- CompositeRule\nCompositeRule \"1\" *-- \"*\" TargetingRule : aggregates_logic\n"
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "When a Feature Flag is updated via the admin dashboard, connected applications (like web frontends) need to know immediately to update UI components. Which pattern handles this seamlessly?",
+                    "choices": [
+                        "The Builder Pattern",
+                        "The Observer Pattern (Pub-Sub)",
+                        "The Decorator Pattern"
+                    ],
+                    "correct_answer": "The Observer Pattern (Pub-Sub)",
+                    "explanation": "The Observer pattern allows a subject (FeatureFlag or FlagManager) to maintain a list of dependents (Observers) and automatically notify them of any state changes without tightly coupling to their specific implementations.",
+                    "uml_mutation": "class FlagObserver {\n    <<interface>>\n    +onFlagUpdated(FeatureFlag flag)\n}\nFeatureFlag --> FlagObserver : notifies\n"
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: System Orchestration & Concurrency",
+            "description": "Design the main entry point (Facade), handle high-throughput read operations, and ensure thread safety.",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "We need a central orchestrator class to load flags, coordinate evaluations, and serve as the single integration point for client applications. What architectural pattern best fits this?",
+                    "choices": [
+                        "The Facade Pattern (FeatureFlagManager)",
+                        "The State Pattern",
+                        "The Prototype Pattern"
+                    ],
+                    "correct_answer": "The Facade Pattern (FeatureFlagManager)",
+                    "explanation": "A Facade provides a simplified, high-level interface to a complex subsystem. `FeatureFlagManager` hides the complexity of rule parsing, context generation, and state evaluation from the client application.",
+                    "uml_mutation": "class FeatureFlagManager {\n    -FeatureFlagManager instance$\n    +getInstance()$ : FeatureFlagManager\n}\n"
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "The `FeatureFlagManager` holds references to the system's flags. Since flags are dynamically fetched from a database and can be purged or reloaded independently of the manager, what is the relationship?",
+                    "choices": [
+                        "Composition (1 to Many)",
+                        "Aggregation (1 to Many)",
+                        "Generalization"
+                    ],
+                    "correct_answer": "Aggregation (1 to Many)",
+                    "explanation": "Aggregation (hollow diamond) represents a 'has-a' relationship where the child lifecycles are independent. The Manager caches the flags, but it doesn't strictly own their permanent source-of-truth existence.",
+                    "uml_mutation": "FeatureFlagManager \"1\" o-- \"*\" FeatureFlag : caches_in_memory\n"
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "In a highly trafficked application, `isFeatureEnabled()` will be called millions of times per minute. To prevent database bottlenecks, how should the evaluation logic be structurally designed?",
+                    "choices": [
+                        "Perform an asynchronous database query every time `isFeatureEnabled` is called.",
+                        "Evaluate entirely in-memory using cached FeatureFlag objects protected by thread-safe data structures (like ConcurrentHashMap).",
+                        "Hardcode flag statuses into the codebase directly."
+                    ],
+                    "correct_answer": "Evaluate entirely in-memory using cached FeatureFlag objects protected by thread-safe data structures (like ConcurrentHashMap).",
+                    "explanation": "For extreme read-heavy workloads, fetching from a database per request is fatal. Flags must be cached in memory. Because background threads update this cache while request threads read from it, concurrency controls (like ConcurrentHashMap) are mandatory to prevent race conditions.",
+                    "uml_mutation": "class FeatureFlagManager {\n    -FeatureFlagManager instance$\n    +getInstance()$ : FeatureFlagManager\n    +isFeatureEnabled(String flagKey, EvaluationContext context) : boolean\n    +updateFlagCache(FeatureFlag flag)\n}\nFeatureFlagManager ..> EvaluationContext : utilizes\n"
+                }
+            ]
+        }
+    ]
+}

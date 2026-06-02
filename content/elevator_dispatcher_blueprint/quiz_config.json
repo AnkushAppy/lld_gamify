@@ -1,0 +1,244 @@
+{
+    "system_id": "elevator_dispatcher_blueprint",
+    "system_title": "Elevator Control Dispatcher LLD",
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Core Entity Definition & Encapsulation",
+            "description": "Establish the foundational physical entities, manage strictly constrained physical states (directions, doors), and enforce encapsulation of internal metrics.",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "In an Elevator System, what is the central Domain Entity representing the physical cabin that moves between floors, holds passengers, and tracks its own hardware state?",
+                    "choices": [
+                        "ElevatorController",
+                        "ElevatorCar",
+                        "MovementService"
+                    ],
+                    "correct_answer": "ElevatorCar",
+                    "explanation": "The 'ElevatorCar' is a first-class Domain Entity (Aggregate). It represents the physical cabin, possessing a distinct identity (e.g., Car #1), continuous lifecycle, and internal physical state (current floor, weight limit).",
+                    "uml_mutation": "class ElevatorCar\n"
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "State Modeling",
+                    "type": "radio",
+                    "text": "An elevator car constantly changes its physical movement state. It can go up, go down, or remain stationary. How should we structurally constrain these states?",
+                    "choices": [
+                        "An integer variable `direction` (-1 for down, 0 for idle, 1 for up).",
+                        "A boolean flag `isMoving`.",
+                        "A dedicated Direction Enumeration."
+                    ],
+                    "correct_answer": "A dedicated Direction Enumeration.",
+                    "explanation": "A dedicated Enum ensures compile-time type safety and prevents arbitrary numerical assignments (like `direction = 5`). It clearly maps the domain's physical bounds (UP, DOWN, IDLE).",
+                    "uml_mutation": "class Direction {\n    <<enumeration>>\n    UP\n    DOWN\n    IDLE\n}\nElevatorCar --> Direction : current_direction\n"
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "Attribute Visibility",
+                    "type": "radio",
+                    "text": "The elevator's `currentFloor` is a critical piece of data used by the dispatcher to calculate optimal routing. However, an external service should never arbitrarily alter it. Which visibility strategy enforces this?",
+                    "choices": [
+                        "- int currentFloor (Private field with a getter, updated only via internal movement methods)",
+                        "+ int currentFloor (Public field for direct access by the Dispatcher)",
+                        "# int currentFloor (Protected field)"
+                    ],
+                    "correct_answer": "- int currentFloor (Private field with a getter, updated only via internal movement methods)",
+                    "explanation": "Private visibility coupled with an explicit getter and zero public setters ensures runtime immutability from outside actors. The floor should only increment/decrement via controlled `moveUp()` or `moveDown()` behavioral methods.",
+                    "uml_mutation": "class ElevatorCar {\n    -int carId\n    -int currentFloor\n    +getCurrentFloor() : int\n    +moveUp()\n    +moveDown()\n}\n"
+                },
+                {
+                    "question_id": "l1_q4",
+                    "skill_tag": "State Modeling",
+                    "type": "radio",
+                    "text": "An elevator has physical doors that must strictly be either open or closed to ensure passenger safety. How is this state structurally mapped?",
+                    "choices": [
+                        "Use an Enum DoorState (OPEN, CLOSED) mapped to a Door entity.",
+                        "Add a String field `doorStatus` directly inside the ElevatorCar.",
+                        "Use integer states defined in global constants."
+                    ],
+                    "correct_answer": "Use an Enum DoorState (OPEN, CLOSED) mapped to a Door entity.",
+                    "explanation": "Encapsulating the door into its own entity with an Enum state accurately models the hardware. It allows you to eventually add logic specific to doors (like `sensorObstruction`) without bloating the main ElevatorCar class.",
+                    "uml_mutation": "class DoorState {\n    <<enumeration>>\n    OPEN\n    CLOSED\n}\nclass Door {\n    +openDoor()\n    +closeDoor()\n}\nDoor --> DoorState : state\n"
+                },
+                {
+                    "question_id": "l1_q5",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "Passengers request elevators by interacting with physical inputs. What foundational leaf entity represents this interactable hardware?",
+                    "choices": [
+                        "InputListener",
+                        "Button",
+                        "BooleanTrigger"
+                    ],
+                    "correct_answer": "Button",
+                    "explanation": "A 'Button' is a core physical hardware abstraction in the domain. It holds state (illuminated/pressed or unpressed) and serves as the origin point for movement requests.",
+                    "uml_mutation": "class Button {\n    -boolean isPressed\n    +press()\n    +reset()\n}\n"
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Structural Relations & Multiplicity Mapping",
+            "description": "Establish physical bounds, differentiate between composition and aggregation for hardware, and introduce polymorphic button panels.",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "An `ElevatorCar` possesses a physical `Door`. If the elevator car is structurally decommissioned and dismantled, the door is inherently dismantled as well. What UML relationship defines this strict 1-to-1 physical ownership?",
+                    "choices": [
+                        "Aggregation (Hollow diamond)",
+                        "Composition (Filled black diamond)",
+                        "Generalization"
+                    ],
+                    "correct_answer": "Composition (Filled black diamond)",
+                    "explanation": "Composition (filled diamond) models strict 'whole-part' physical ownership. A specific elevator door does not exist independently outside the context of its parent elevator car.",
+                    "uml_mutation": "ElevatorCar \"1\" *-- \"1\" Door : contains\n"
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "There are two types of buttons: HallButtons (located on a floor, with UP/DOWN directions) and CarButtons (located inside the elevator, with destination floor numbers). To adhere to the Open-Closed Principle, how do we structurally model this?",
+                    "choices": [
+                        "Make `Button` an abstract class and create specific subclasses for `HallButton` and `CarButton`.",
+                        "Add `direction` and `destinationFloor` to a single `Button` class, leaving one null depending on context.",
+                        "Create two completely unrelated classes to avoid inheritance overhead."
+                    ],
+                    "correct_answer": "Make `Button` an abstract class and create specific subclasses for `HallButton` and `CarButton`.",
+                    "explanation": "Polymorphism ensures different button behaviors and data requirements are cleanly separated. A HallButton inherently requires a directional intent (UP/DOWN), while a CarButton requires a numerical destination.",
+                    "uml_mutation": "class Button {\n    <<abstract>>\n}\nclass HallButton {\n    -Direction buttonDirection\n}\nclass CarButton {\n    -int destinationFloor\n}\nButton <|-- HallButton\nButton <|-- CarButton\n"
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "An `ElevatorCar` contains an internal control panel with multiple `CarButton`s (one for each floor). How is this mapped structurally?",
+                    "choices": [
+                        "Composition (1-to-1)",
+                        "Composition (1-to-Many, from Car to CarButton)",
+                        "Aggregation (1-to-Many, from CarButton to Car)"
+                    ],
+                    "correct_answer": "Composition (1-to-Many, from Car to CarButton)",
+                    "explanation": "The internal buttons are physically built into the elevator car. A 1-to-Many Composition accurately describes that a car owns multiple buttons which share its precise lifecycle.",
+                    "uml_mutation": "ElevatorCar \"1\" *-- \"*\" CarButton : internal_panel\n"
+                },
+                {
+                    "question_id": "l2_q4",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "A central `ElevatorSystem` oversees the entire building's fleet of `ElevatorCar`s. How should this relationship be modeled?",
+                    "choices": [
+                        "Aggregation (1-to-Many, from ElevatorSystem to ElevatorCar)",
+                        "Dependency (Dotted line)",
+                        "Generalization"
+                    ],
+                    "correct_answer": "Aggregation (1-to-Many, from ElevatorSystem to ElevatorCar)",
+                    "explanation": "Aggregation represents that the System manages a fleet of Cars. The cars have an independent operational lifecycle (e.g., they can be taken offline for maintenance) while the system continues running.",
+                    "uml_mutation": "class ElevatorSystem {\n    -String buildingName\n}\nElevatorSystem \"1\" o-- \"*\" ElevatorCar : manages_fleet\n"
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Interface Behaviors & Design Patterns",
+            "description": "Implement behavioral design patterns to handle dynamic dispatch routing, decouple request structures, and trigger physical hardware updates.",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "Buildings require different elevator dispatching algorithms (e.g., First-Come-First-Serve, Shortest-Seek-Time, SCAN). Which design pattern allows the system to swap these algorithms dynamically?",
+                    "choices": [
+                        "The Singleton Pattern",
+                        "The Strategy Pattern",
+                        "The Proxy Pattern"
+                    ],
+                    "correct_answer": "The Strategy Pattern",
+                    "explanation": "The Strategy Pattern encapsulates specific algorithms inside interchangeable classes. This allows the building manager to switch dispatching logic without altering the core ElevatorSystem codebase.",
+                    "uml_mutation": "class DispatchStrategy {\n    <<interface>>\n    +selectCar(ElevatorCar[] cars, Request req) : ElevatorCar\n}\nclass ShortestSeekTimeStrategy {\n    +selectCar(ElevatorCar[] cars, Request req) : ElevatorCar\n}\nDispatchStrategy <|.. ShortestSeekTimeStrategy\nElevatorSystem --> DispatchStrategy : utilizes\n"
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "To decouple dispatching logic, we should wrap the button inputs (source floor, destination floor, direction) into a unified payload object. What structural benefit does a `Request` parameter object provide?",
+                    "choices": [
+                        "It makes the application run faster in multi-threaded environments.",
+                        "It prevents method signatures in the `DispatchStrategy` from breaking if new request parameters (e.g., 'isVIP' or 'WeightLimit') are added later.",
+                        "It maps directly to database rows."
+                    ],
+                    "correct_answer": "It prevents method signatures in the `DispatchStrategy` from breaking if new request parameters (e.g., 'isVIP' or 'WeightLimit') are added later.",
+                    "explanation": "Using a parameter object (`Request`) ensures the method signature remains stable (Open-Closed Principle). When dispatch rules evolve to require new context, only the Request object structure changes, not the interface signature.",
+                    "uml_mutation": "class Request {\n    -int originFloor\n    -int destinationFloor\n    -Direction direction\n}\nDispatchStrategy ..> Request : evaluates\n"
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "When an `ElevatorCar` changes floors, the physical `DisplayScreen` inside the car and on the hallway floors must update to show the new number. How should the ElevatorCar notify these screens while remaining loosely coupled?",
+                    "choices": [
+                        "Implement the Observer Pattern: Screens act as Observers listening to the ElevatorCar (Subject).",
+                        "Create a continuous while-loop thread inside the DisplayScreen checking the car's floor.",
+                        "Hardcode the `DisplayScreen.update()` method inside `ElevatorCar.moveUp()`."
+                    ],
+                    "correct_answer": "Implement the Observer Pattern: Screens act as Observers listening to the ElevatorCar (Subject).",
+                    "explanation": "The Observer pattern allows the ElevatorCar to broadcast its state changes to any number of registered display screens without tightly coupling the elevator logic to UI/Hardware display rendering code.",
+                    "uml_mutation": "class FloorObserver {\n    <<interface>>\n    +onFloorChanged(int newFloor, Direction dir)\n}\nclass DisplayScreen {\n    +onFloorChanged(int newFloor, Direction dir)\n}\nFloorObserver <|.. DisplayScreen\nElevatorCar --> FloorObserver : notifies\n"
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: System Orchestration & Concurrency",
+            "description": "Design the main entry point (Facade), manage central orchestration, and handle highly concurrent hardware requests safely.",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "We need a central orchestrator class to receive all button presses, interact with the DispatchStrategy, and issue movement commands to the fleet. What architectural pattern best fits this single point of interaction?",
+                    "choices": [
+                        "The Builder Pattern",
+                        "The Facade Pattern (Dispatcher / Controller, often Singleton)",
+                        "The Flyweight Pattern"
+                    ],
+                    "correct_answer": "The Facade Pattern (Dispatcher / Controller, often Singleton)",
+                    "explanation": "A Facade (`ElevatorController` or `Dispatcher`) simplifies the complex subsystem of algorithms, fleets, and observers by providing a unified, high-level interface to handle all incoming physical requests.",
+                    "uml_mutation": "class ElevatorController {\n    -ElevatorController instance$\n    +getInstance()$ : ElevatorController\n}\nElevatorController *-- ElevatorSystem : delegates\n"
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "During peak hours, hundreds of button presses may occur simultaneously. The `ElevatorController` cannot process all requests instantly. How should incoming requests be managed structurally before dispatch?",
+                    "choices": [
+                        "By dropping requests that cannot be handled immediately.",
+                        "By utilizing thread-safe BlockingQueues or PriorityQueues to buffer pending requests asynchronously.",
+                        "By directly pausing the user's interface thread until an elevator arrives."
+                    ],
+                    "correct_answer": "By utilizing thread-safe BlockingQueues or PriorityQueues to buffer pending requests asynchronously.",
+                    "explanation": "In concurrent hardware systems, decoupling the producer (Button Press) from the consumer (Dispatcher) using thread-safe structures like `BlockingQueue` prevents race conditions and ensures no requests are lost under high load.",
+                    "uml_mutation": "class ElevatorController {\n    -ElevatorController instance$\n    +getInstance()$ : ElevatorController\n}\nclass RequestQueue {\n    +enqueue(Request req)\n    +dequeue() : Request\n}\nElevatorController *-- ElevatorSystem : delegates\nElevatorController *-- RequestQueue : buffers_in\n"
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "A passenger on floor 5 presses the 'UP' HallButton. Which method signature on the `ElevatorController` represents the cleanest, most domain-driven way to submit this request to the system?",
+                    "choices": [
+                        "+acceptExternalRequest(int floor, Direction dir)",
+                        "+triggerHardware(String buttonId, boolean state)",
+                        "+moveElevatorTo(int floor)"
+                    ],
+                    "correct_answer": "+acceptExternalRequest(int floor, Direction dir)",
+                    "explanation": "The signature cleanly maps the physical action (calling from a specific floor with a desired direction) directly to the domain. This allows the controller to instantiate a `Request` object and place it into the `RequestQueue`.",
+                    "uml_mutation": "class ElevatorController {\n    -ElevatorController instance$\n    +getInstance()$ : ElevatorController\n    +acceptExternalRequest(int floor, Direction dir)\n    +acceptInternalRequest(int carId, int destinationFloor)\n}\nclass RequestQueue {\n    +enqueue(Request req)\n    +dequeue() : Request\n}\nElevatorController *-- ElevatorSystem : delegates\nElevatorController *-- RequestQueue : buffers_in\nHallButton ..> ElevatorController : calls\nCarButton ..> ElevatorController : calls\n"
+                }
+            ]
+        }
+    ]
+}

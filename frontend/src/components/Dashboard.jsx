@@ -1,8 +1,50 @@
+function TrackCard({ track, onSelect }) {
+  if (!track.available) {
+    return (
+      <div className="rounded-xl border border-slate-800/60 bg-slate-900/40 p-6 opacity-60">
+        <div className="mb-3 text-3xl">{track.icon}</div>
+        <h3 className="mb-2 text-lg font-bold text-slate-300">{track.title}</h3>
+        <p className="mb-4 text-sm leading-relaxed text-slate-500">{track.tagline}</p>
+        <span className="inline-block rounded-full border border-slate-700 bg-slate-800/80 px-3 py-1 text-xs font-medium text-slate-500">
+          Coming soon
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(track.system_id)}
+      className="group flex h-full w-full flex-col rounded-xl border border-slate-800 bg-slate-900 p-6 text-left shadow-xl transition-all hover:-translate-y-0.5 hover:border-orange-500/70 hover:shadow-orange-950/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+    >
+      <div className="mb-3 text-3xl">{track.icon}</div>
+      <h3 className="mb-2 text-lg font-bold text-slate-100 group-hover:text-orange-100">
+        {track.title}
+      </h3>
+      <p className="mb-6 flex-1 text-sm leading-relaxed text-slate-400">{track.tagline}</p>
+      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-orange-400 transition-colors group-hover:text-orange-300">
+        Start track
+        <svg
+          aria-hidden="true"
+          className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </span>
+    </button>
+  );
+}
+
 export default function Dashboard({ tracks, onSelect, loading, error }) {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-300">
-        Loading architecture tracks...
+        Loading tracks...
       </div>
     );
   }
@@ -15,39 +57,29 @@ export default function Dashboard({ tracks, onSelect, loading, error }) {
     );
   }
 
+  const availableCount = tracks.filter((t) => t.available).length;
+
   return (
     <div className="min-h-screen bg-slate-950 p-8 font-sans text-slate-100">
-      <div className="mx-auto max-w-4xl">
-        <h1 className="mb-2 bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-4xl font-black text-transparent">
-          🕹️ LLD SPEEDRUN ARCHITECT
-        </h1>
-        <p className="mb-8 text-slate-400">
-          Choose a system design track to begin your 15-minute assembly.
-        </p>
+      <div className="mx-auto max-w-5xl">
+        <header className="mb-10">
+          <h1 className="mb-2 bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-4xl font-black text-transparent">
+            LLD Blueprint Assembly
+          </h1>
+          <p className="max-w-xl text-slate-400">
+            Pick a system design track. Answer questions to build the UML diagram
+            piece by piece.
+          </p>
+          {availableCount > 0 && (
+            <p className="mt-2 text-xs text-slate-500">
+              {availableCount} track{availableCount === 1 ? "" : "s"} ready
+            </p>
+          )}
+        </header>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {tracks.map((track) => (
-            <div
-              key={track.system_id}
-              className={`rounded-xl border p-6 shadow-xl transition-all ${
-                track.available
-                  ? "border-slate-800 bg-slate-900 hover:border-orange-500"
-                  : "border-slate-800/60 bg-slate-900/50 opacity-70"
-              }`}
-            >
-              <h3 className="mb-2 text-xl font-bold">
-                {track.icon} {track.title}
-              </h3>
-              <p className="mb-6 text-sm text-slate-400">{track.tagline}</p>
-              <button
-                type="button"
-                disabled={!track.available}
-                onClick={() => onSelect(track.system_id)}
-                className="w-full rounded-lg bg-orange-600 py-2.5 font-bold text-white transition-all hover:bg-orange-500 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
-              >
-                {track.available ? "Launch Speedrun Engine" : "Coming Soon"}
-              </button>
-            </div>
+            <TrackCard key={track.system_id} track={track} onSelect={onSelect} />
           ))}
         </div>
       </div>

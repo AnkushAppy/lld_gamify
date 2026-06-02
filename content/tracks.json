@@ -15,18 +15,25 @@
       "available": true
     },
     {
-      "system_id": "splitwise",
+      "system_id": "feature_flag_blueprint",
+      "icon": "🚩",
+      "title": "Feature Flag Engine",
+      "tagline": "Composite, Observer, and Facade patterns for toggle systems.",
+      "available": true
+    },
+    {
+      "system_id": "splitwise_blueprint",
       "icon": "💸",
       "title": "Splitwise Expense Engine",
       "tagline": "Graph balancing, user splits, and transactional atomicity.",
-      "available": false
+      "available": true
     },
     {
-      "system_id": "elevator",
+      "system_id": "elevator_dispatcher_blueprint",
       "icon": "🛗",
       "title": "Elevator Control Dispatcher",
       "tagline": "State patterns, request queues, and hardware wrappers.",
-      "available": false
+      "available": true
     }
   ]
 }

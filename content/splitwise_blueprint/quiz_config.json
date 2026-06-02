@@ -1,0 +1,244 @@
+{
+    "system_id": "splitwise_blueprint",
+    "system_title": "Expense Sharing Engine LLD (Splitwise Clone)",
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Core Entity Definition & Encapsulation",
+            "description": "Define the foundational entities of the expense-sharing domain, enforce data immutability, and manage state constraints for monetary values and transaction types.",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "In an expense-sharing application, what is the central Domain Entity that acts as the primary actor holding state, balances, and authentication data?",
+                    "choices": [
+                        "User",
+                        "AuthenticationService",
+                        "UserIdString"
+                    ],
+                    "correct_answer": "User",
+                    "explanation": "The 'User' is a first-class Domain Entity (Actor). It maintains a unique identity, an ongoing lifecycle, and holds essential domain state (profile, notification preferences) beyond just utility functions.",
+                    "uml_mutation": "class User\n"
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "Attribute Visibility",
+                    "type": "radio",
+                    "text": "A User's contact details (like email and phone number) must be accessible to other group members but strictly protected from arbitrary modification. Which visibility constraint satisfies this?",
+                    "choices": [
+                        "+ String email (Public field)",
+                        "- String email (Private field with a getter, but no setter)",
+                        "# String email (Protected field)"
+                    ],
+                    "correct_answer": "- String email (Private field with a getter, but no setter)",
+                    "explanation": "Private visibility combined with a getter ensures runtime immutability and guards structural invariants, preventing unauthorized alteration of the user's core identity data.",
+                    "uml_mutation": "class User {\n    -String userId\n    -String email\n    +getEmail() : String\n}\n"
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "When a user pays a bill, it needs to be recorded. What core domain object encapsulates the total amount paid, the payer, and the contextual metadata of the transaction?",
+                    "choices": [
+                        "DatabaseLedger",
+                        "Expense",
+                        "ReceiptImage"
+                    ],
+                    "correct_answer": "Expense",
+                    "explanation": "The 'Expense' is the core transactional entity. It encapsulates the 'who, what, and how much' of a real-world transaction, serving as the central record for all subsequent splitting calculations.",
+                    "uml_mutation": "class Expense {\n    -String expenseId\n    -double totalAmount\n    -String description\n}\n"
+                },
+                {
+                    "question_id": "l1_q4",
+                    "skill_tag": "State Modeling",
+                    "type": "radio",
+                    "text": "An Expense can be divided in different ways (EQUAL, EXACT, PERCENT). What is the most architecturally robust way to constrain these split types?",
+                    "choices": [
+                        "A flexible String variable named 'splitType'.",
+                        "A dedicated ExpenseType Enumeration.",
+                        "An integer array mapping to documentation."
+                    ],
+                    "correct_answer": "A dedicated ExpenseType Enumeration.",
+                    "explanation": "Enums enforce compile-time type safety. They constrain the domain state space to an explicit pool of valid options, completely eliminating systemic typo errors (like 'EQAUL' instead of 'EQUAL').",
+                    "uml_mutation": "class ExpenseType {\n    <<enumeration>>\n    EQUAL\n    EXACT\n    PERCENT\n}\nExpense --> ExpenseType : categorized_by\n"
+                },
+                {
+                    "question_id": "l1_q5",
+                    "skill_tag": "State Modeling",
+                    "type": "radio",
+                    "text": "An Expense is divided into granular portions allocated to specific users. What core leaf entity captures the specific amount owed by an individual for a single Expense?",
+                    "choices": [
+                        "Split",
+                        "DoubleAmount",
+                        "OweString"
+                    ],
+                    "correct_answer": "Split",
+                    "explanation": "A 'Split' is a fundamental Value Object/Entity representing the calculated or exact portion of an expense owed by one specific user.",
+                    "uml_mutation": "class Split {\n    -double amount\n    +getAmount() : double\n    +setAmount(double amount)\n}\n"
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Structural Relations & Multiplicity Mapping",
+            "description": "Establish the structural links, map complex multi-user group boundaries, and design polymorphically for different splitting behaviors.",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Multiplicity Mapping",
+                    "type": "radio",
+                    "text": "Users frequently organize into 'Groups' (e.g., 'Trip to Hawaii'). A User can be in multiple Groups, and a Group has multiple Users. What structural relationship defines this?",
+                    "choices": [
+                        "Composition (1-to-1)",
+                        "Aggregation (*-to-*) (Many-to-Many)",
+                        "Inheritance"
+                    ],
+                    "correct_answer": "Aggregation (*-to-*) (Many-to-Many)",
+                    "explanation": "Aggregation (hollow diamond) represents a 'has-a' relationship where lifecycles are independent. If the Group is deleted, the Users still exist. A Many-to-Many multiplicity allows mutual inclusion.",
+                    "uml_mutation": "class Group {\n    -String groupId\n    -String name\n}\nGroup \"*\" o-- \"*\" User : members\n"
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "Each Split must be tied to exactly one User who owes the money. How should we link the Split to the User structurally?",
+                    "choices": [
+                        "Split inherits from User.",
+                        "Split holds a direct association to the User.",
+                        "User holds a composition over Split."
+                    ],
+                    "correct_answer": "Split holds a direct association to the User.",
+                    "explanation": "A Split is conceptually a record pointing to a User. The directed association ensures every granular split knows exactly which domain User is responsible for that specific amount.",
+                    "uml_mutation": "Split --> User : assigned_to\n"
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "An Expense consists of a list of Splits. If the Expense is deleted from the system, its corresponding Splits are completely invalid and must be destroyed. What defines this relationship?",
+                    "choices": [
+                        "Aggregation (Hollow diamond)",
+                        "Dependency (Dotted arrow)",
+                        "Composition (Filled black diamond from Expense to Split)"
+                    ],
+                    "correct_answer": "Composition (Filled black diamond from Expense to Split)",
+                    "explanation": "Composition models strict ownership. The Splits are intrinsic parts of the Expense; they have no standalone meaning or lifecycle outside of their parent transaction.",
+                    "uml_mutation": "Expense \"1\" *-- \"*\" Split : composed_of\n"
+                },
+                {
+                    "question_id": "l2_q4",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "Splits have different internal data requirements. A 'PercentSplit' requires a percentage value, while an 'ExactSplit' just requires an absolute amount. How should we model the `Split` class to satisfy the Open-Closed Principle?",
+                    "choices": [
+                        "Add `percentage` and `exactAmount` fields to a single Split class, leaving them null when unused.",
+                        "Make Split an abstract class and create specific subclasses like `PercentSplit`, `ExactSplit`, and `EqualSplit`.",
+                        "Store all split data as a JSON String."
+                    ],
+                    "correct_answer": "Make Split an abstract class and create specific subclasses like `PercentSplit`, `ExactSplit`, and `EqualSplit`.",
+                    "explanation": "Polymorphism ensures different split configurations are encapsulated in their own subclasses. This prevents bloated classes with unused variables and makes extending new split rules (e.g., 'SharesSplit') seamless.",
+                    "uml_mutation": "class Split {\n    <<abstract>>\n}\nclass EqualSplit\nclass ExactSplit\nclass PercentSplit {\n    -double percent\n}\nSplit <|-- EqualSplit\nSplit <|-- ExactSplit\nSplit <|-- PercentSplit\n"
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Interface Behaviors & Design Patterns",
+            "description": "Utilize Gang of Four (GoF) design patterns to implement validation strategies, balance simplifications, and event-driven notifications.",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Behavioral Polymorphism",
+                    "type": "radio",
+                    "text": "Before an Expense is saved, its splits must be validated (e.g., Percent splits must add to 100%, Exact splits must sum to the total). Which design pattern encapsulates these interchangeable validation algorithms?",
+                    "choices": [
+                        "The Strategy Pattern",
+                        "The Builder Pattern",
+                        "The Proxy Pattern"
+                    ],
+                    "correct_answer": "The Strategy Pattern",
+                    "explanation": "The Strategy Pattern defines a family of validation algorithms, encapsulates each one, and makes them interchangeable. We can dynamically apply the correct `SplitValidator` strategy based on the `ExpenseType`.",
+                    "uml_mutation": "class SplitValidator {\n    <<interface>>\n    +validate(Expense expense) : boolean\n}\nclass PercentSplitValidator {\n    +validate(Expense expense) : boolean\n}\nclass ExactSplitValidator {\n    +validate(Expense expense) : boolean\n}\nSplitValidator <|.. PercentSplitValidator\nSplitValidator <|.. ExactSplitValidator\nExpense ..> SplitValidator : validated_by\n"
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "The core feature of the system is the 'Balance Sheet', which tracks who owes whom. Which method signature is the most appropriate for querying the simplified balance between two users?",
+                    "choices": [
+                        "+getBalance() double",
+                        "+getNetBalance(User user1, User user2) double",
+                        "+getNetBalance(String groupId) List"
+                    ],
+                    "correct_answer": "+getNetBalance(User user1, User user2) double",
+                    "explanation": "To find the specific monetary relationship between two individuals, the method must accept both users as parameters and return a scalar numerical value representing the net owed amount.",
+                    "uml_mutation": "class BalanceSheet {\n    -Map balances\n    +getNetBalance(User user1, User user2) : double\n    +updateBalance(User payer, User owee, double amount)\n}\n"
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Structural Dependency",
+                    "type": "radio",
+                    "text": "When a new Expense is added to a Group, all Users in that Group must be notified (e.g., via Push Notification or Email). How should the Group notify the Users while remaining loosely coupled to the notification delivery mechanism?",
+                    "choices": [
+                        "Implement the Observer Pattern: Users implement a generic interface to receive updates from the Group.",
+                        "Create a continuous while-loop thread for each user checking the database.",
+                        "Directly instantiate `EmailService` inside the Group class."
+                    ],
+                    "correct_answer": "Implement the Observer Pattern: Users implement a generic interface to receive updates from the Group.",
+                    "explanation": "The Observer pattern allows the Subject (Group) to broadcast state changes to multiple listeners (Users/Devices) automatically, decoupling the core domain logic from the actual notification delivery mechanism.",
+                    "uml_mutation": "class ExpenseObserver {\n    <<interface>>\n    +onExpenseAdded(Expense expense)\n}\nUser <|.. ExpenseObserver\nGroup --> ExpenseObserver : notifies\n"
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: System Orchestration & Concurrency",
+            "description": "Design the main entry point (Facade), manage central orchestration, and handle thread-safe updates to user balances.",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Entity Identification",
+                    "type": "radio",
+                    "text": "We need a central orchestrator to expose capabilities to the client API (add user, create group, add expense). What architectural pattern best fits this single point of interaction?",
+                    "choices": [
+                        "The Decorator Pattern",
+                        "The Facade Pattern (ExpenseManager)",
+                        "The Flyweight Pattern"
+                    ],
+                    "correct_answer": "The Facade Pattern (ExpenseManager)",
+                    "explanation": "A Facade (`ExpenseManager`) simplifies a complex subsystem by providing a unified, high-level interface. It hides the complexity of creating expenses, triggering validation strategies, and updating balance sheets from the external API.",
+                    "uml_mutation": "class ExpenseManager {\n    -ExpenseManager instance$\n    +getInstance()$ : ExpenseManager\n}\nExpenseManager *-- BalanceSheet : orchestrates\n"
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Method Signature Design",
+                    "type": "radio",
+                    "text": "When delegating the creation of an expense, the `ExpenseManager` method signature needs to pass comprehensive data to the domain. Which signature is best aligned with scalable LLD principles?",
+                    "choices": [
+                        "+addExpense(double amount, String userId, List splits)",
+                        "+addExpense(ExpenseType type, double amount, String payerId, List splits, String groupId)",
+                        "+addExpense(Expense expense)"
+                    ],
+                    "correct_answer": "+addExpense(ExpenseType type, double amount, String payerId, List splits, String groupId)",
+                    "explanation": "Passing explicit domain parameters to the Manager's factory method allows the Manager to coordinate instantiation, inject the correct validation strategy based on the `ExpenseType`, and route the update to the correct `Group`.",
+                    "uml_mutation": "class ExpenseManager {\n    -ExpenseManager instance$\n    +getInstance()$ : ExpenseManager\n    +addExpense(ExpenseType type, double amount, String payerId, List splits, String groupId)\n}\nExpenseManager *-- BalanceSheet : orchestrates\n"
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "State Modeling",
+                    "type": "radio",
+                    "text": "Two users add expenses simultaneously that affect the same shared balance. How must the `updateBalance()` method in the `BalanceSheet` be designed to prevent financial discrepancies?",
+                    "choices": [
+                        "It should execute asynchronously using optimistic UI updates.",
+                        "It must be designed as a thread-safe atomic operation (e.g., using synchronized locks or database transactions) on the specific user-pair ledger.",
+                        "It should simply read the database, add the number, and write back sequentially."
+                    ],
+                    "correct_answer": "It must be designed as a thread-safe atomic operation (e.g., using synchronized locks or database transactions) on the specific user-pair ledger.",
+                    "explanation": "In concurrent applications, modifying shared state (balances) requires mutual exclusion (locking) to prevent race conditions. Without atomic operations, concurrent read-modify-write sequences will result in lost updates and corrupted ledgers.",
+                    "uml_mutation": "class BalanceSheet {\n    -Map balances\n    +getNetBalance(User user1, User user2) : double\n    +updateBalance(User payer, User owee, double amount)\n    +simplifyDebts(String groupId) : List\n}\nExpenseManager ..> Group : accesses\n"
+                }
+            ]
+        }
+    ]
+}
