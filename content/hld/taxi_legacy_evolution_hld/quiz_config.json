@@ -1,0 +1,226 @@
+{
+    "system_id": "taxi_legacy_evolution_hld",
+    "discipline": "hld",
+    "canvas_type": "flowchart",
+    "system_title": "Legacy Taxi App -> Cloud-Native Evolution",
+    "chaos_scenario": {
+        "title": "Migrating to the New Architecture Under Load...",
+        "success_badge": "Turnaround Architect",
+        "steps": [
+            { "label": "Thundering herd of HTTP polling eliminated", "status": "ok" },
+            { "label": "Full table scans replaced by O(1) Geo queries", "status": "ok" },
+            { "label": "Stripe API timeout absorbed by message queues", "status": "ok" },
+            { "label": "Monolithic database safely partitioned", "status": "ok" }
+        ]
+    },
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Escaping the Monolithic Bottleneck",
+            "description": "The legacy system consists of a single server and mobile apps that constantly poll via HTTP. Fix the ingress layer to prevent connection exhaustion and SPOFs.",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "High Availability",
+                    "type": "radio",
+                    "text": "Flaw: The mobile app connects directly to a single IP address of one monolithic server. If it crashes, the business stops. How do you resolve this Single Point of Failure (SPOF)?",
+                    "choices": [
+                        "Hardcode three different IPs in the mobile app code",
+                        "Introduce a Global Load Balancer pointing to an API Gateway backed by an auto-scaling group",
+                        "Move the monolith to a larger mainframe server"
+                    ],
+                    "correct_answer": "Introduce a Global Load Balancer pointing to an API Gateway backed by an auto-scaling group",
+                    "explanation": "A Global Load Balancer removes the SPOF at ingress, dynamically routing traffic to healthy instances in an auto-scaling group via an API Gateway.",
+                    "uml_mutation": "    client((Mobile Apps)) --> glb[Global Load Balancer]\n    glb --> api[API Gateway]\n",
+                    "health_impact": { "availability": 15, "latency": -2, "cost": 4 }
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "Latency Optimization",
+                    "type": "radio",
+                    "text": "Flaw: 100,000 drivers send GPS updates via HTTP POST every 3 seconds. The TLS handshake overhead is melting the server CPU (Thundering Herd). What protocol fixes this?",
+                    "choices": [
+                        "HTTP/1.0",
+                        "Persistent WebSockets",
+                        "FTP (File Transfer Protocol)"
+                    ],
+                    "correct_answer": "Persistent WebSockets",
+                    "explanation": "WebSockets maintain a long-lived, persistent, bi-directional TCP connection. This entirely eliminates the CPU-intensive HTTP handshake overhead for high-frequency location streaming.",
+                    "uml_mutation": "    api --> ws[WebSocket Cluster]\n",
+                    "health_impact": { "availability": 8, "latency": -35, "cost": 5 }
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "Async Processing",
+                    "type": "radio",
+                    "text": "Flaw: The monolith tries to process, validate, and write every GPS ping synchronously. During traffic spikes, the server locks up. How do we safely buffer this massive write-heavy ingestion?",
+                    "choices": [
+                        "Write location logs to local CSV files",
+                        "Drop 50% of the location packets randomly",
+                        "Publish the pings to a high-throughput event stream (like Apache Kafka)"
+                    ],
+                    "correct_answer": "Publish the pings to a high-throughput event stream (like Apache Kafka)",
+                    "explanation": "Kafka acts as a highly durable shock absorber. It decouples the fast ingestion of GPS data from the slower downstream processing services, preventing system overload.",
+                    "uml_mutation": "    ws --> kafka[[Kafka Event Stream]]\n",
+                    "health_impact": { "availability": 12, "latency": -10, "cost": 6 }
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Fixing the Database Meltdown",
+            "description": "The legacy system uses a single MySQL database for everything. Queries are locking, and spatial lookups are timing out.",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Latency Optimization",
+                    "type": "radio",
+                    "text": "Flaw: Finding a nearby driver involves a SQL query: `SELECT * FROM drivers WHERE lat BETWEEN X AND Y`. This triggers a full table scan taking seconds. What is the modern fix?",
+                    "choices": [
+                        "Add more RAM to the MySQL server",
+                        "Implement an in-memory Geospatial Database (like Redis Geo / Geohash)",
+                        "Fetch all drivers to the mobile app and calculate distance on the phone"
+                    ],
+                    "correct_answer": "Implement an in-memory Geospatial Database (like Redis Geo / Geohash)",
+                    "explanation": "Redis Geo uses Geohashes to map 2D coordinates into 1D strings, allowing spatial lookups (finding nearby drivers) to execute in O(log N) time entirely in memory.",
+                    "uml_mutation": "    kafka --> locSvc[Location Service]\n    locSvc --> redisGeo[(Redis Geospatial Index)]\n",
+                    "health_impact": { "availability": 5, "latency": -40, "cost": 8 }
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "Scalability",
+                    "type": "radio",
+                    "text": "Flaw: Every time a user opens the app, the system queries the DB for their static profile and settings, starving the DB of connections. How do we offload these reads?",
+                    "choices": [
+                        "Introduce a Distributed Cache (Redis/Memcached) for read-heavy static data",
+                        "Store all profiles in Kafka",
+                        "Switch the database to SQLite"
+                    ],
+                    "correct_answer": "Introduce a Distributed Cache (Redis/Memcached) for read-heavy static data",
+                    "explanation": "A distributed cache sits in front of the database (Cache-Aside pattern), serving frequent read requests in sub-milliseconds and freeing up database connections.",
+                    "uml_mutation": "    api --> userSvc[User Service]\n    userSvc --> cache[(Redis Distributed Cache)]\n",
+                    "health_impact": { "availability": 6, "latency": -25, "cost": 4 }
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Fault Tolerance",
+                    "type": "radio",
+                    "text": "Flaw: We still have a single primary relational database. If the hardware fails, data is lost and the system crashes. How do we add redundancy and further scale reads?",
+                    "choices": [
+                        "Back up the database to an external hard drive every Sunday",
+                        "Implement a Primary-Replica architecture with asynchronous replication",
+                        "Run two active primary databases sharing the same disk"
+                    ],
+                    "correct_answer": "Implement a Primary-Replica architecture with asynchronous replication",
+                    "explanation": "A Primary-Replica setup ensures that if the primary dies, a replica can be promoted to prevent downtime. It also allows you to route heavy read queries exclusively to the replicas.",
+                    "uml_mutation": "    userSvc --> dbPrimary[(SQL Primary DB)]\n    dbPrimary -.->|Async Replication| dbReplica[(SQL Read Replicas)]\n    userSvc --> dbReplica\n",
+                    "health_impact": { "availability": 15, "latency": -5, "cost": 10 }
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Breaking Synchronous Traps & Scaling Writes",
+            "description": "Synchronous 3rd-party API calls are blocking threads, and historical data is maxing out the storage limits.",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Async Processing",
+                    "type": "radio",
+                    "text": "Flaw: At the end of a ride, the monolith calls Stripe synchronously. If Stripe is slow, the driver's app hangs on 'Processing...' and server threads are blocked. How do we fix this?",
+                    "choices": [
+                        "Reduce the HTTP timeout to 10 milliseconds",
+                        "Decouple it using a Message Queue and an Asynchronous Payment Worker",
+                        "Charge the user directly from their mobile phone"
+                    ],
+                    "correct_answer": "Decouple it using a Message Queue and an Asynchronous Payment Worker",
+                    "explanation": "By pushing a 'charge_request' to a message queue, the API can immediately respond 'Success' to the driver. The Payment Worker safely handles the charge in the background without blocking.",
+                    "uml_mutation": "    api --> tripSvc[Trip Service]\n    tripSvc --> payQueue[[Payment Queue]]\n    payQueue --> payWorker[Async Payment Worker]\n",
+                    "health_impact": { "availability": 10, "latency": -15, "cost": 5 }
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Data Partitioning",
+                    "type": "radio",
+                    "text": "Flaw: The legacy `trip_history` SQL table has 2 billion rows. Indexes no longer fit in RAM, and inserts are crawling. What is the best storage solution for immutable, high-volume historical logs?",
+                    "choices": [
+                        "A horizontally scalable NoSQL wide-column store (like Cassandra)",
+                        "Delete all trips older than 30 days",
+                        "Move it to a Redis Cache"
+                    ],
+                    "correct_answer": "A horizontally scalable NoSQL wide-column store (like Cassandra)",
+                    "explanation": "Cassandra is designed for massive, append-heavy workloads. By partitioning historical trip data by UserID across many nodes, it provides infinite horizontal write scaling.",
+                    "uml_mutation": "    tripSvc --> cassandra[(Cassandra NoSQL / Trip History)]\n",
+                    "health_impact": { "availability": 8, "latency": -10, "cost": 12 }
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Scalability",
+                    "type": "radio",
+                    "text": "Flaw: The legacy system relies on MySQL's AUTO_INCREMENT for Trip IDs. At 10,000 trips/second, this centralized lock creates a massive bottleneck. What pattern replaces this?",
+                    "choices": [
+                        "Generate UUIDs in the database using a stored procedure",
+                        "Use a Distributed ID Generator (like Twitter Snowflake / Ticket Server)",
+                        "Use the timestamp as the ID"
+                    ],
+                    "correct_answer": "Use a Distributed ID Generator (like Twitter Snowflake / Ticket Server)",
+                    "explanation": "Snowflake algorithms generate highly unique, time-sortable 64-bit IDs locally across distributed workers without requiring a central database lock, entirely removing the write bottleneck.",
+                    "uml_mutation": "    tripSvc --> idGen[Distributed ID Generator]\n",
+                    "health_impact": { "availability": 5, "latency": -8, "cost": 3 }
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: Surviving Chaos & Scale",
+            "description": "The architecture is modernized, but we need safeguards against bad actors, cascading failures, and operational blind spots.",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Rate Limiting",
+                    "type": "radio",
+                    "text": "Flaw: Competitors deploy botnets to rapidly request price estimates, trying to reverse-engineer our surge pricing. This DDOS attack exhausts our servers. Where do we stop this?",
+                    "choices": [
+                        "At the Edge layer using a WAF and Rate Limiter before the API Gateway",
+                        "By writing an if-statement in the Trip Service",
+                        "By shutting down the Location Service"
+                    ],
+                    "correct_answer": "At the Edge layer using a WAF and Rate Limiter before the API Gateway",
+                    "explanation": "A Web Application Firewall (WAF) and Rate Limiter drop malicious or excessively repetitive traffic at the absolute edge of the network, before it consumes any internal compute resources.",
+                    "uml_mutation": "    glb --> waf[WAF & Rate Limiter]\n    waf --> api\n",
+                    "health_impact": { "availability": 12, "latency": 0, "cost": 3 }
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Fault Tolerance",
+                    "type": "radio",
+                    "text": "Flaw: When a payment fails due to insufficient funds, the Payment Worker instantly retries in a tight infinite loop, crashing the worker pool. What pattern handles failures gracefully?",
+                    "choices": [
+                        "Ignore the error and assume it worked",
+                        "A Dead Letter Queue (DLQ) paired with Exponential Backoff retries",
+                        "Restart the Payment Worker automatically"
+                    ],
+                    "correct_answer": "A Dead Letter Queue (DLQ) paired with Exponential Backoff retries",
+                    "explanation": "Messages that fail processing are routed to a DLQ. Exponential backoff ensures retries happen at increasing intervals (1s, 2s, 4s), giving external services time to recover without overwhelming them.",
+                    "uml_mutation": "    payWorker --> dlq[[Dead Letter Queue]]\n    dlq -.->|Exponential Backoff| payWorker\n",
+                    "health_impact": { "availability": 10, "latency": 0, "cost": 2 }
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "Observability",
+                    "type": "radio",
+                    "text": "Flaw: A user complains that booking a trip took 15 seconds. With 20 different microservices, developers have no idea which service caused the delay. What resolves this operational blind spot?",
+                    "choices": [
+                        "Distributed Tracing (e.g., Jaeger / OpenTelemetry) passing a Correlation ID",
+                        "Reading the local text logs on all 500 servers",
+                        "Adding `console.log('here')` in the code"
+                    ],
+                    "correct_answer": "Distributed Tracing (e.g., Jaeger / OpenTelemetry) passing a Correlation ID",
+                    "explanation": "Distributed tracing injects a unique Correlation ID at the API Gateway. This ID is passed between all microservices, allowing engineers to visualize the exact latency path and pinpoint the bottleneck.",
+                    "uml_mutation": "    api -.-> obs[Distributed Tracing & Metrics]\n    tripSvc -.-> obs\n    userSvc -.-> obs\n    style redisGeo fill:#065f46,stroke:#34d399\n    style kafka fill:#065f46,stroke:#34d399\n",
+                    "health_impact": { "availability": 8, "latency": -2, "cost": 5 }
+                }
+            ]
+        }
+    ]
+}

@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Union
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,7 +34,7 @@ class AnswerSubmission(BaseModel):
     system_id: str
     level_index: int
     question_id: str
-    selected_answer: str
+    selected_answer: Union[str, list[str]]
 
 
 class ValidationResult(BaseModel):
@@ -129,10 +129,32 @@ def _sanitize_question(question: dict[str, Any]) -> dict[str, Any]:
     return {
         "question_id": question["question_id"],
         "skill_tag": question["skill_tag"],
-        "type": question["type"],
+        "type": question.get("type", "radio"),
         "text": question["text"],
         "choices": question["choices"],
     }
+
+
+def _normalize_selected(selected: str | list[str]) -> list[str]:
+    if isinstance(selected, list):
+        return selected
+    return [selected] if selected else []
+
+
+def _answers_match(question: dict[str, Any], selected: str | list[str]) -> bool:
+    q_type = question.get("type", "radio")
+    correct = question["correct_answer"]
+    selected_list = _normalize_selected(selected)
+
+    if q_type == "checkbox":
+        if not isinstance(correct, list):
+            return False
+        return set(selected_list) == set(correct)
+
+    expected = correct[0] if isinstance(correct, list) and len(correct) == 1 else correct
+    if not isinstance(expected, str):
+        return False
+    return len(selected_list) == 1 and selected_list[0] == expected
 
 
 def _initial_canvas_for(config: dict[str, Any]) -> str:
@@ -243,7 +265,7 @@ def get_config(system_id: str):
 def validate_answer(submission: AnswerSubmission):
     config = _load_config(submission.system_id)
     question = _find_question(config, submission.level_index, submission.question_id)
-    is_correct = submission.selected_answer == question["correct_answer"]
+    is_correct = _answers_match(question, submission.selected_answer)
     health_impact = None
 
     if is_correct and config.get("discipline") == "hld":

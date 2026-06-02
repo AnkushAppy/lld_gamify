@@ -36,16 +36,20 @@
                 },
                 {
                     "question_id": "l1_q2",
-                    "skill_tag": "Latency Optimization",
-                    "type": "radio",
-                    "text": "Most URL lookups are read-heavy and repeat the same popular links. Which edge component dramatically cuts redirect latency for hot URLs?",
+                    "skill_tag": "Latency Reduction & High Availability",
+                    "type": "checkbox",
+                    "text": "Hot URLs are read millions of times globally. Which TWO edge components reduce redirect latency and shield your origin from read overload?",
                     "choices": [
-                        "CDN / Edge Cache",
-                        "Write-ahead log on primary DB",
-                        "Batch cron job every hour"
+                        "Geographically distributed CDN",
+                        "Kafka write-ahead pipeline",
+                        "Edge caching layer at PoPs",
+                        "Single primary SQL database for every lookup"
                     ],
-                    "correct_answer": "CDN / Edge Cache",
-                    "explanation": "A CDN caches redirect responses at the edge, serving repeated lookups in single-digit milliseconds instead of round-tripping to origin.",
+                    "correct_answer": [
+                        "Geographically distributed CDN",
+                        "Edge caching layer at PoPs"
+                    ],
+                    "explanation": "CDNs and edge caching place redirect responses close to users, minimizing network hops and protecting origin servers from bandwidth exhaustion.",
                     "uml_mutation": "    glb --> cdn[CDN / Edge Cache]\n",
                     "health_impact": { "availability": 4, "latency": -40, "cost": 5 }
                 },

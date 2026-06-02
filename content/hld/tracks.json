@@ -13,6 +13,13 @@
       "title": "Taxi Booking Engine",
       "tagline": "WebSockets, geospatial indexing, Kafka streams, and surge pricing.",
       "available": true
+    },
+    {
+      "system_id": "taxi_legacy_evolution_hld",
+      "icon": "🔄",
+      "title": "Legacy Taxi → Cloud-Native",
+      "tagline": "Evolve a failing monolith into a resilient, scalable architecture.",
+      "available": true
     }
   ]
 }

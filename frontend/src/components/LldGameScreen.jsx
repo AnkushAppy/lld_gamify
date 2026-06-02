@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { formatSelectedForApi, hasSelection, toggleChoice } from "../answerUtils.js";
 import { validateAnswer } from "../api.js";
 import { applyMutation } from "../canvasEngine.js";
 import LldGameCanvas from "./LldGameCanvas.jsx";
@@ -13,7 +14,7 @@ function createInitialState(config) {
     score: 0,
     canvas: config.initial_canvas,
     gameOver: false,
-    selected: "",
+    selectedChoices: [],
     feedback: null,
     submitting: false,
   };
@@ -29,8 +30,23 @@ export default function LldGameScreen({ systemId, config, onQuit }) {
 
   const currentQuestion = currentLevel?.questions[state.questionIdx] ?? null;
 
+  function handleToggleChoice(choice) {
+    if (!currentQuestion) return;
+    setState((prev) => ({
+      ...prev,
+      selectedChoices: toggleChoice(
+        prev.selectedChoices,
+        choice,
+        currentQuestion.type,
+      ),
+      feedback: null,
+    }));
+  }
+
   async function handleSubmit() {
-    if (!currentQuestion || !state.selected || state.submitting) return;
+    if (!currentQuestion || !hasSelection(state.selectedChoices) || state.submitting) {
+      return;
+    }
 
     setState((prev) => ({ ...prev, submitting: true, feedback: null }));
 
@@ -39,7 +55,7 @@ export default function LldGameScreen({ systemId, config, onQuit }) {
         systemId,
         state.levelIdx,
         currentQuestion.question_id,
-        state.selected,
+        formatSelectedForApi(state.selectedChoices, currentQuestion.type),
       );
 
       if (response.is_correct) {
@@ -74,7 +90,7 @@ export default function LldGameScreen({ systemId, config, onQuit }) {
           levelIdx: nextLevelIdx,
           questionIdx: nextQuestionIdx,
           gameOver,
-          selected: "",
+          selectedChoices: [],
           feedback,
           submitting: false,
         }));
@@ -131,8 +147,8 @@ export default function LldGameScreen({ systemId, config, onQuit }) {
           <QuestionPanel
             currentLevel={currentLevel}
             currentQuestion={currentQuestion}
-            selected={state.selected}
-            onSelect={(value) => setState((prev) => ({ ...prev, selected: value }))}
+            selectedChoices={state.selectedChoices}
+            onToggleChoice={handleToggleChoice}
             onSubmit={handleSubmit}
             submitting={state.submitting}
             feedback={state.feedback}

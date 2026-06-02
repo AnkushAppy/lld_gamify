@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { formatSelectedForApi, hasSelection, toggleChoice } from "../answerUtils.js";
 import { validateAnswer } from "../api.js";
 import {
   HLD_METER_DEFAULTS,
@@ -18,7 +19,7 @@ function createInitialState(config) {
     canvas: config.initial_canvas,
     meters: { ...HLD_METER_DEFAULTS },
     gameOver: false,
-    selected: "",
+    selectedChoices: [],
     feedback: null,
     submitting: false,
   };
@@ -34,8 +35,23 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
 
   const currentQuestion = currentLevel?.questions[state.questionIdx] ?? null;
 
+  function handleToggleChoice(choice) {
+    if (!currentQuestion) return;
+    setState((prev) => ({
+      ...prev,
+      selectedChoices: toggleChoice(
+        prev.selectedChoices,
+        choice,
+        currentQuestion.type,
+      ),
+      feedback: null,
+    }));
+  }
+
   async function handleSubmit() {
-    if (!currentQuestion || !state.selected || state.submitting) return;
+    if (!currentQuestion || !hasSelection(state.selectedChoices) || state.submitting) {
+      return;
+    }
 
     setState((prev) => ({ ...prev, submitting: true, feedback: null }));
 
@@ -44,7 +60,7 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
         systemId,
         state.levelIdx,
         currentQuestion.question_id,
-        state.selected,
+        formatSelectedForApi(state.selectedChoices, currentQuestion.type),
       );
 
       if (response.is_correct) {
@@ -80,7 +96,7 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
           levelIdx: nextLevelIdx,
           questionIdx: nextQuestionIdx,
           gameOver,
-          selected: "",
+          selectedChoices: [],
           feedback,
           submitting: false,
         }));
@@ -134,8 +150,8 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
           <QuestionPanel
             currentLevel={currentLevel}
             currentQuestion={currentQuestion}
-            selected={state.selected}
-            onSelect={(value) => setState((prev) => ({ ...prev, selected: value }))}
+            selectedChoices={state.selectedChoices}
+            onToggleChoice={handleToggleChoice}
             onSubmit={handleSubmit}
             submitting={state.submitting}
             feedback={state.feedback}
