@@ -1,0 +1,81 @@
+{
+  "system_id": "parking_lot",
+  "system_title": "Dynamic Parking Lot Design",
+  "levels": [
+    {
+      "level_index": 1,
+      "title": "Level 1: Core Entity Definition",
+      "questions": [
+        {
+          "question_id": "l1_q1",
+          "skill_tag": "Entity Identification",
+          "type": "radio",
+          "text": "What core domain entity represents a customer's proof of entry and tracks time constraints?",
+          "choices": ["ParkingTicket", "ReceiptLogger", "TimeCounter"],
+          "correct_answer": "ParkingTicket",
+          "explanation": "A ParkingTicket is a core domain entity with a unique life cycle and identity tracking identity over time.",
+          "uml_mutation": "class ParkingTicket {\n}\n"
+        },
+        {
+          "question_id": "l1_q2",
+          "skill_tag": "Attribute Visibility",
+          "type": "radio",
+          "text": "The creation timestamp on the ticket must not be modified by external classes post-issuance. What visibility fits best?",
+          "choices": ["+ LocalDateTime issuedAt", "- LocalDateTime issuedAt", "# LocalDateTime issuedAt"],
+          "correct_answer": "- LocalDateTime issuedAt",
+          "explanation": "Private visibility (-) enforces structural encapsulation, allowing readers via accessors while locking mutations out.",
+          "uml_mutation": "class ParkingTicket {\n    - LocalDateTime issuedAt\n}\n"
+        }
+      ]
+    },
+    {
+      "level_index": 2,
+      "title": "Level 2: Structural Relationships",
+      "questions": [
+        {
+          "question_id": "l2_q1",
+          "skill_tag": "Entity Identification",
+          "type": "radio",
+          "text": "Which entity owns and manages a collection of individual parking spaces?",
+          "choices": ["ParkingLot", "ParkingGarage", "FloorManager"],
+          "correct_answer": "ParkingLot",
+          "explanation": "ParkingLot is the aggregate root that orchestrates spot assignment and ticket issuance.",
+          "uml_mutation": "class ParkingLot {\n}\n"
+        },
+        {
+          "question_id": "l2_q2",
+          "skill_tag": "Composition vs Aggregation",
+          "type": "radio",
+          "text": "ParkingSpots cannot exist independently once a ParkingLot is destroyed. What relationship type applies?",
+          "choices": ["Composition", "Aggregation", "Association"],
+          "correct_answer": "Composition",
+          "explanation": "Composition (filled diamond) indicates strong ownership — spots are part of the lot's lifecycle.",
+          "uml_mutation": "class ParkingSpot {\n}\nParkingLot *-- ParkingSpot\n"
+        }
+      ]
+    },
+    {
+      "level_index": 3,
+      "title": "Level 3: Multiplicity & Constraints",
+      "questions": [
+        {
+          "question_id": "l3_q1",
+          "skill_tag": "Multiplicity Constraints",
+          "type": "checkbox",
+          "text": "Which statements correctly describe the ParkingLot-to-ParkingSpot relationship?",
+          "choices": [
+            "One lot contains many spots",
+            "One spot belongs to many lots",
+            "Each spot belongs to exactly one lot"
+          ],
+          "correct_answers": [
+            "One lot contains many spots",
+            "Each spot belongs to exactly one lot"
+          ],
+          "explanation": "Multiplicity is 1-to-many: a lot has many spots, but each spot belongs to exactly one lot.",
+          "uml_mutation": "ParkingLot \"1\" --> \"*\" ParkingSpot\n"
+        }
+      ]
+    }
+  ]
+}
