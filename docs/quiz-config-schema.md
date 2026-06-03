@@ -1,6 +1,6 @@
 # Quiz Config Schema
 
-This document defines the JSON contract between content authors and the game engine. The FastAPI backend will validate all configs against Pydantic models derived from this spec.
+This document defines the JSON contract between content authors and the game engine. The Node.js API validates configs against this spec at runtime.
 
 ## Top-Level Object
 

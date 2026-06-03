@@ -22,7 +22,7 @@ export default function App() {
     fetchSystems(discipline)
       .then(setTracks)
       .catch(() =>
-        setError("Failed to load tracks. Is the API running on port 8000?"),
+        setError("Failed to load tracks. Is the API running on port 8001?"),
       )
       .finally(() => setLoading(false));
   }, [discipline]);

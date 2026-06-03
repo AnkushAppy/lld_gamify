@@ -68,18 +68,17 @@ Correct answers append `uml_mutation` snippets to the canvas. The same JSON-driv
 | Layer | Technology |
 |-------|------------|
 | Frontend | React, Vite, Tailwind CSS, Mermaid.js |
-| Backend | FastAPI (stateless validation) |
+| Backend | Node.js, Express (stateless validation) |
 | Content | JSON quiz configs per track |
 
 ## Project structure
 
 ```
 lld_gamify/
-├── app.py                   # Uvicorn entry point
-├── backend/
-│   ├── main.py              # REST API + discipline-aware discovery
-│   ├── canvas_engine.py     # LLD classDiagram mutation merging
-│   └── hld_canvas_engine.py # HLD flowchart mutations
+├── package.json             # Root scripts (dev API + frontend)
+├── server/
+│   ├── index.js             # Express REST API
+│   └── lib/                 # Config discovery, validation
 ├── frontend/src/
 │   ├── components/
 │   │   ├── ModeSelector.jsx # LLD / HLD / Clean Code fork
@@ -97,33 +96,52 @@ lld_gamify/
 
 ## Quick start
 
-### Backend
+From the project root:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python app.py
-```
-
-API docs: http://127.0.0.1:8000/docs
-
-### Frontend
-
-```bash
-cd frontend
 npm install
+cd frontend && npm install && cd ..
 npm run dev
 ```
 
-Game UI: http://127.0.0.1:5173/
+This starts the **Node.js API** on port 8001 and the **Vite frontend** on port 5173.
 
-Vite proxies `/api` to the backend on port 8000.
+Run them separately if you prefer:
+
+```bash
+npm run dev:api    # API only → http://127.0.0.1:8001
+npm run dev:web    # UI only  → http://127.0.0.1:5173
+```
+
+Game UI: http://127.0.0.1:5173/ — Vite proxies `/api` to the backend on port 8001.
+
+Port 8001 is the default because 8000 is often taken (e.g. by Docker). Override with `PORT=8002 npm run dev:api` and update the proxy in `frontend/vite.config.js` if needed.
+
+### npm scripts
+
+| Script | Purpose |
+|--------|---------|
+| `npm run dev` | API + Vite dev servers together |
+| `npm run dev:api` | Express API only (port 8001) |
+| `npm run dev:web` | Vite frontend only (port 5173) |
+| `npm start` | Production API (`PORT` from env, default 8001) |
+| `npm run build` | Build frontend to `frontend/dist/` |
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `8001` | API listen port |
+| `CONTENT_DIR` | `content/` | Quiz JSON root directory |
+| `CORS_ORIGINS` | `*` | Comma-separated allowed origins |
+
+Canvas mutations run in the browser; the API only serves track metadata and validates answers.
 
 ## API
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
+| `GET` | `/api/health` | Health check |
 | `GET` | `/api/systems?discipline=lld\|hld\|clean_code` | Track list for a discipline |
 | `GET` | `/api/game/start/{system_id}` | Quiz structure (no answers or mutations) |
 | `POST` | `/api/game/validate` | Validate answer; returns `health_impact` (HLD) or `coupling_impact` (Clean Code) |
@@ -146,7 +164,7 @@ For radio questions, `selected_answer` is a string.
 
 1. Create `content/lld/<system_id>/quiz_config.json`, `content/hld/...`, or `content/clean_code/...`
 2. Register the track in the matching `tracks.json`
-3. Restart the backend (config is cached on first load)
+3. Restart the API server (config is cached on first load)
 
 Minimal question shape:
 
