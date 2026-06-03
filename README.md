@@ -91,7 +91,6 @@ lld_gamify/
 │   ├── hld/
 │   └── clean_code/
 ├── docs/                    # PRD, schema, architecture
-└── scripts/                 # Content authoring utilities
 ```
 
 ## Quick start

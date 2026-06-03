@@ -35,13 +35,13 @@ Unlike static quizzes, the game state accumulates structural syntax over time.
 
 ### 4. Functional Requirements
 
-#### 4.1 Game State & Mutation Engine (Backend)
+#### 4.1 Game State & Mutation Engine (Frontend)
 
-- **Canvas Accumulator:** The engine must maintain a running string state for the active session, initialized with the layout header (`classDiagram`).
-- **Non-Destructive Appending:** When a question is answered correctly, the backend looks up its associated `uml_mutation` instruction and morphs the state.
-  - *Insertion Mutations:* Appending an entirely new block or association line.
-  - *Update Mutations:* Injecting properties inside an existing class block wrapper.
-- **Idempotency/Retry Buffer:** If an answer is incorrect, the engine must return a failure status without corrupting or updating the cumulative canvas string.
+- **Canvas state:** React holds the running Mermaid string per session, initialized from `initial_canvas` on the config or level.
+- **Mutation application:** On a correct validation response, the client applies the question's `uml_mutation` (snapshot, style, or incremental merge).
+  - *Insertion mutations:* Append a new class block or association line.
+  - *Update mutations:* Replace an existing class block with an expanded version.
+- **Retry buffer:** Incorrect answers return failure from the API without changing local canvas state.
 
 See [architecture.md](architecture.md) for mutation engine design details.
 
@@ -67,22 +67,22 @@ classDiagram
 
 ### 5. Unified Technical Stack
 
-- **Frontend Framework:** Gradio (utilizes `gr.Markdown` to render dynamic live updates of backend-generated Mermaid strings).
-- **Game Engine API:** FastAPI (maintains in-memory session arrays, manages validation pipelines, and executes configuration updates).
-- **Data Definition Layer:** Schema configurations stored in a standardized text-driven JSON payload.
+- **Frontend:** React, Vite, Tailwind CSS, Mermaid.js (live canvas + question UI; client-side mutation engine).
+- **Game Engine API:** Node.js, Express (stateless track discovery, config sanitization, answer validation).
+- **Data Definition Layer:** JSON quiz configs under `content/{lld,hld,clean_code}/`.
 
 ```
 +--------------------------------------------------+
-|                   Gradio UI                      |
-| (Live Mermaid Canvas & Dynamic Question Forms)   |
+|              React + Vite Frontend               |
+| (Live Mermaid canvas, meters, question forms)    |
 +------------------------+-------------------------+
-                         |  HTTP REST
+                         |  /api REST
                          v
 +--------------------------------------------------+
-|                  FastAPI Engine                  |
-| (Canvas accumulator, mutation engine, validation)|
+|              Express API (server/)               |
+| (Track discovery, validation, config sanitization) |
 +------------------------+-------------------------+
-                         |  Reads Config
+                         |  Reads
                          v
                   [quiz_config.json]
 ```

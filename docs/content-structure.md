@@ -6,8 +6,15 @@ Each LLD system is a self-contained **system pack**—a folder containing a sing
 
 ```
 content/
-└── <system_id>/                  # e.g. parking_lot
-    └── quiz_config.json          # Levels, questions, uml_mutation instructions
+├── lld/
+│   └── <system_id>/
+│       └── quiz_config.json
+├── hld/
+│   └── <system_id>/
+│       └── quiz_config.json
+└── clean_code/
+    └── <system_id>/
+        └── quiz_config.json
 ```
 
 ## File Responsibilities
@@ -19,7 +26,7 @@ The single source of truth for a system pack. Defines:
 - System metadata (`system_id`, `system_title`)
 - Ordered list of levels with progression rules
 - Questions with `skill_tag`, choices, correct answers, explanations
-- `uml_mutation` strings that the backend applies to the canvas on correct answers
+- `uml_mutation` strings applied on the client when the player answers correctly
 
 Validated against the schema in [quiz-config-schema.md](quiz-config-schema.md).
 
@@ -27,9 +34,8 @@ Validated against the schema in [quiz-config-schema.md](quiz-config-schema.md).
 
 Each question carries an `uml_mutation`—a fragment of Mermaid class diagram syntax. When the player answers correctly:
 
-1. The backend appends or replaces syntax in the session canvas.
-2. The updated canvas string is sent to the frontend.
-3. Gradio re-renders the live Mermaid diagram.
+1. The client applies the mutation to local canvas state.
+2. Mermaid re-renders the updated diagram.
 
 When the player answers incorrectly, the canvas is untouched—the player retries until correct.
 
@@ -37,14 +43,14 @@ When the player answers incorrectly, the canvas is untouched—the player retrie
 
 1. Create `content/<system_id>/`.
 2. Write `quiz_config.json` following the schema—design questions so each `uml_mutation` builds toward the final diagram.
-3. Restart the server—the new system appears in the system selector automatically.
+3. Restart the API server—the new system appears on the dashboard automatically.
 
 ### Generating config from existing UML
 
 If you already have a UML diagram (Mermaid, PlantUML, or screenshot), use the [UML → Quiz Pipeline](uml-to-quiz-pipeline.md):
 
 - **LLM prompt** — full reverse-engineering into production-ready JSON with skill tags and explanations.
-- **`scripts/generate_skeleton_config.py`** — programmatic scaffold from a `.mmd` file with placeholder questions around real mutations.
+- **Copy an existing track** — duplicate a folder under `content/lld/`, `content/hld/`, or `content/clean_code/` and edit questions in place.
 
 ## Naming Conventions
 

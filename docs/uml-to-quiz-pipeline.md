@@ -7,7 +7,7 @@ Two approaches are supported:
 | Approach | Best for | Output |
 |----------|----------|--------|
 | **LLM prompt** | Full quiz with skill tags, distractors, and explanations | Production-ready `quiz_config.json` |
-| **Skeleton script** | Text-based `.mmd` files | Scaffold JSON with placeholder questions around real `uml_mutation` lines |
+| **Manual / copy template** | Small tracks or edits to existing configs | Hand-authored JSON following the schema |
 
 See also: [quiz-config-schema.md](quiz-config-schema.md), [content-structure.md](content-structure.md).
 
@@ -71,34 +71,9 @@ Here is the UML input to parse:
 
 ### After generation
 
-1. Save the output to `content/<system_id>/quiz_config.json`.
-2. Validate against [quiz-config-schema.md](quiz-config-schema.md).
-3. Optionally run the skeleton validator script to sanity-check mutation sequencing (see below).
-
----
-
-## Automated Script: Build and Validate Mutations
-
-For text-based `.mmd` (Mermaid) files, use the Python utility at [`scripts/generate_skeleton_config.py`](../scripts/generate_skeleton_config.py) to scaffold a raw skeleton JSON. You (or an LLM) can then fill in questions, skill tags, and explanations around the actual mutation lines.
-
-### Usage
-
-```bash
-# From a Mermaid file
-python scripts/generate_skeleton_config.py \
-  --system-id parking_lot \
-  --title "Dynamic Parking Lot Design" \
-  --input path/to/diagram.mmd \
-  --output content/parking_lot/quiz_config.json
-
-# From inline example (no file)
-python scripts/generate_skeleton_config.py \
-  --system-id parking_lot \
-  --title "Parking Lot" \
-  --demo
-```
-
-The script parses each non-empty Mermaid line (after `classDiagram`) into a placeholder question with the correct `uml_mutation` pre-filled.
+1. Save the output to `content/<discipline>/<system_id>/quiz_config.json`.
+2. Register the track in the matching `tracks.json`.
+3. Validate structure against [quiz-config-schema.md](quiz-config-schema.md).
 
 ---
 

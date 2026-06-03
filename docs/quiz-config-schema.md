@@ -75,7 +75,7 @@ Type-specific fields are documented below.
 
 ## `uml_mutation` Field
 
-The mutation string is Mermaid class diagram syntax (without the `classDiagram` header). The backend prepends the header and manages the accumulated canvas.
+The mutation string is Mermaid syntax for the active discipline (`classDiagram` or `flowchart TD`). The client applies it to session canvas state on a correct answer (snapshot, style append, or incremental merge).
 
 ### Insert Mutations
 

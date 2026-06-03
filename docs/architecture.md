@@ -2,118 +2,85 @@
 
 ## Overview
 
-The LLD Speedrun Gamifier is a two-tier Python application: a **Gradio frontend** that renders live Mermaid diagrams and a **FastAPI backend** that maintains a **canvas accumulator**—a running Mermaid string mutated on each correct answer. All game content is loaded from JSON config files; no static image assets or database required.
+Architecture Speedrun is a **unified JavaScript stack**: a React frontend and a Node.js/Express API. The API is stateless—it discovers quiz configs from `content/`, strips answers for game start, and validates submissions. Canvas mutations run entirely in the browser via `frontend/src/mutationEngine.js` and discipline-specific engines.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                      Gradio UI                          │
+│              React + Vite (port 5173)                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │ Live Mermaid │  │ Question     │  │ Skill Tag &   │  │
-│  │ Canvas       │  │ Components   │  │ Feedback      │  │
+│  │ Mermaid      │  │ Question     │  │ Meters /      │  │
+│  │ Canvas       │  │ Panel        │  │ Score         │  │
 │  └──────────────┘  └──────────────┘  └───────────────┘  │
+│         Client-side mutation engine (snapshot/style/inc)  │
 └───────────────────────────┬─────────────────────────────┘
-                            │ HTTP REST
+                            │ /api (proxied in dev)
                             ▼
 ┌─────────────────────────────────────────────────────────┐
-│                    FastAPI Engine                        │
+│           Express API (port 8001)                       │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │ Canvas       │  │ Answer       │  │ Mutation      │  │
-│  │ Accumulator  │  │ Validator    │  │ Engine        │  │
+│  │ Track        │  │ Config       │  │ Answer        │  │
+│  │ Discovery    │  │ Sanitizer    │  │ Validator     │  │
 │  └──────────────┘  └──────────────┘  └───────────────┘  │
 └───────────────────────────┬─────────────────────────────┘
                             │ Reads
                             ▼
               ┌─────────────────────────────┐
-              │  content/<system_id>/       │
-              │    quiz_config.json         │
+              │  content/{lld,hld,clean_code}/ │
+              │    <system_id>/quiz_config.json │
               └─────────────────────────────┘
 ```
 
 ## Components
 
-### Gradio Frontend
+### React Frontend
 
-Responsible for rendering the Blueprint Assembly experience:
+- **Game screens** per discipline: `LldGameScreen`, `HldGameScreen`, `CleanCodeGameScreen`.
+- **Canvas state** held in React; each correct answer applies `uml_mutation` client-side.
+- **Mutation modes:** snapshot (full diagram replace), style (append overrides), incremental (append/merge).
+- **Scoring:** LLD uses points; HLD uses health meters; Clean Code uses decoupling score.
 
-- Render the live Mermaid diagram via `gr.Markdown` using backend-supplied canvas strings.
-- Display the current question's `skill_tag` prominently.
-- Dynamically render question widgets based on `type` (`radio`, `checkbox`).
-- Reconstruct input layouts when transitioning between questions.
-- Show instant feedback on failure—explanation contextualized to the skill constraint.
+### Express API (`server/`)
 
-### FastAPI Backend
+- **`GET /api/systems`** — list tracks from `tracks.json` + filesystem discovery.
+- **`GET /api/game/start/{system_id}`** — sanitized config (no answers or mutations exposed).
+- **`POST /api/game/validate`** — compare selected answer; return explanation, mutation, and discipline-specific impacts.
+- **`GET /api/config/{system_id}`** — full config for authoring/debug.
 
-Responsible for game state, validation, and canvas mutations:
+Config is cached in memory after first load; restart the API to pick up JSON edits.
 
-- **Game initialization:** Load a system pack from `content/<system_id>/`, parse and validate `quiz_config.json` via Pydantic.
-- **Canvas accumulator:** Maintain a per-session Mermaid string, initialized to `classDiagram\n`.
-- **Mutation engine:** On correct answer, apply the question's `uml_mutation` to the canvas (insert or update).
-- **Retry buffer:** On incorrect answer, return failure without modifying the canvas.
-- **Session management:** Track current level, answered questions, and applied mutations in memory.
+## Canvas Mutations (Client)
 
-## Canvas Accumulator
+Each session starts from `initial_canvas` on the config or level. On correct validation:
 
-Each session starts with an empty diagram header:
+1. Frontend receives `uml_mutation` from the API response.
+2. Mutation engine applies it to local canvas state.
+3. Mermaid re-renders the diagram.
 
-```
-classDiagram
-```
-
-On each correct answer, the mutation engine appends or replaces Mermaid syntax. The full canvas string is returned to the frontend for rendering:
-
-````markdown
-```mermaid
-classDiagram
-    class ParkingTicket {
-        - LocalDateTime issuedAt
-    }
-```
-````
+Incorrect answers do not change the canvas.
 
 ### Mutation Types
 
-| Type | Behavior | Example |
-|------|----------|---------|
-| **Insert** | Append a new class block or association line | `class ParkingTicket {\n}\n` |
-| **Update** | Replace an existing class block with an expanded version | `class ParkingTicket {\n    - LocalDateTime issuedAt\n}\n` |
+| Mode | When | Behavior |
+|------|------|----------|
+| **Snapshot** | Mutation starts with `classDiagram`, `flowchart`, or `graph` | Replace entire canvas |
+| **Style** | Only `style`, `classDef`, or class styling lines | Append visual overrides |
+| **Incremental** | Default | Append classes, edges, or merge class blocks |
 
-The engine determines insert vs. update by checking whether the target class name already exists in the canvas string. Update mutations must supply the complete replacement block for that class.
+## Disciplines
 
-## Planned API Surface
+| Discipline | Canvas | Validate extras |
+|------------|--------|-----------------|
+| `lld` | `classDiagram` | Score only (frontend) |
+| `hld` | `flowchart TD` | `health_impact` |
+| `clean_code` | `classDiagram` | `coupling_impact` |
 
-These endpoints are design targets—not yet implemented.
-
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| `GET` | `/systems` | List available LLD system packs |
-| `POST` | `/game/start` | Start a session; returns initial empty canvas |
-| `GET` | `/game/{session_id}/question` | Get current question (without answer/mutation) and canvas snapshot |
-| `POST` | `/game/{session_id}/submit` | Submit answer; returns pass/fail, explanation, updated canvas |
-| `GET` | `/game/{session_id}/canvas` | Get current Mermaid canvas string |
-
-## Session Model (In-Memory)
-
-```
-Session {
-  session_id: str
-  system_id: str
-  canvas: str                  # accumulated Mermaid string
-  current_level: int           # 1-indexed
-  current_question_index: int  # index within current level
-  completed_questions: set[str]  # question_ids answered correctly
-  applied_mutations: list[str]   # uml_mutation strings already applied
-}
-```
-
-Sessions are ephemeral. Restarting the server clears all progress and canvas state.
-
-## Data Validation
-
-All config files are validated at load time using Pydantic models derived from [quiz-config-schema.md](quiz-config-schema.md). Invalid configs must fail fast with a clear error message—never partially load a broken system pack.
+Discipline is read from `quiz_config.json` or inferred from the folder path (`content/clean_code/...`).
 
 ## Design Principles
 
-1. **Constructive learning.** The diagram is built incrementally; every correct answer is a visible reward.
-2. **Data-driven first.** Adding a new LLD system means adding a folder with `quiz_config.json`—no code changes.
-3. **Fail fast.** Schema validation at startup; incorrect answers never corrupt canvas state.
-4. **Zero asset dependency.** Mermaid strings replace static UML images entirely.
+1. **Constructive learning.** The diagram evolves with every correct answer.
+2. **Data-driven first.** New tracks are JSON under `content/`—no API code changes.
+3. **Stateless API.** No sessions; frontend owns game progress.
+4. **Zero asset dependency.** Mermaid strings replace static UML images.
+
+See [quiz-config-schema.md](quiz-config-schema.md) for the JSON contract.
