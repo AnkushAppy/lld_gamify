@@ -53,7 +53,9 @@ export default function DiagramCanvas({ source, variant = "lld" }) {
         className={`min-h-[360px] w-full flex items-center justify-center overflow-x-auto rounded-xl border p-6 ${
           isHld
             ? "border-sky-900/40 bg-slate-950/80"
-            : "border-slate-800 bg-slate-950"
+            : variant === "clean_code"
+              ? "border-violet-900/40 bg-slate-950/80"
+              : "border-slate-800 bg-slate-950"
         }`}
       />
       <details className="rounded-lg border border-slate-800 bg-slate-950 p-3">

@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import re
 
+from backend.mutation_engine import apply_mutation_mode, append_lines
+
 CANVAS_HEADER = "classDiagram\n"
-CANVAS_PLACEHOLDER = 'classDiagram\nnote "Answer questions to assemble the blueprint"\n'
-PLACEHOLDER_NOTE = 'note "Answer questions to assemble the blueprint"'
+CANVAS_PLACEHOLDER = 'classDiagram\nnote "Start"\n'
+PLACEHOLDER_NOTE = 'note "Start"'
 
 
 def init_canvas() -> str:
@@ -56,17 +58,7 @@ def _replace_or_append_class(canvas: str, class_name: str, class_block: str) -> 
     return canvas + class_block
 
 
-def _append_line(canvas: str, line: str) -> str:
-    line = line.strip()
-    if not line or line in canvas:
-        return canvas
-    return canvas + line + "\n"
-
-
-def apply_mutation(canvas: str, mutation: str) -> str:
-    if not mutation or not mutation.strip():
-        return canvas
-
+def _apply_incremental(canvas: str, mutation: str) -> str:
     if canvas == CANVAS_HEADER or PLACEHOLDER_NOTE in canvas:
         canvas = CANVAS_HEADER
 
@@ -85,6 +77,17 @@ def apply_mutation(canvas: str, mutation: str) -> str:
         line = line.strip()
         remaining = rest
         if line:
-            canvas = _append_line(canvas, line)
+            canvas = append_lines(canvas, line)
 
     return canvas
+
+
+def apply_mutation(canvas: str, mutation: str) -> str:
+    if not mutation or not mutation.strip():
+        return canvas
+
+    next_canvas, mode = apply_mutation_mode(canvas, mutation)
+    if mode in ("snapshot", "style"):
+        return next_canvas
+
+    return _apply_incremental(canvas, mutation)

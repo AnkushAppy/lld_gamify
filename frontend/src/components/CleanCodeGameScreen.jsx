@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
 import { formatSelectedForApi, hasSelection, toggleChoice } from "../answerUtils.js";
 import { validateAnswer } from "../api.js";
+import { applyMutation } from "../canvasEngine.js";
 import {
-  HLD_METER_DEFAULTS,
-  applyHealthImpact,
-  applyHldMutation,
-  metersHealthy,
-  resolveHealthImpact,
-} from "../hldCanvasEngine.js";
+  COUPLING_DEFAULTS,
+  applyCouplingImpact,
+  couplingHealthy,
+  couplingLabel,
+  resolveCouplingImpact,
+} from "../cleanCodeEngine.js";
 import { resolveLevelCanvas } from "../mutationEngine.js";
-import ChaosVictory from "./ChaosVictory.jsx";
-import HealthMeters from "./HealthMeters.jsx";
-import HldGameCanvas from "./HldGameCanvas.jsx";
+import CleanCodeGameCanvas from "./CleanCodeGameCanvas.jsx";
+import CouplingMeter from "./CouplingMeter.jsx";
 import QuestionPanel from "./QuestionPanel.jsx";
 
 function createInitialState(config) {
@@ -19,7 +19,8 @@ function createInitialState(config) {
     levelIdx: 1,
     questionIdx: 0,
     canvas: resolveLevelCanvas(config, 1),
-    meters: { ...HLD_METER_DEFAULTS },
+    coupling: { ...COUPLING_DEFAULTS },
+    couplingDelta: 0,
     gameOver: false,
     selectedChoices: [],
     feedback: null,
@@ -27,7 +28,7 @@ function createInitialState(config) {
   };
 }
 
-export default function HldGameScreen({ systemId, config, onQuit }) {
+export default function CleanCodeGameScreen({ systemId, config, onQuit }) {
   const [state, setState] = useState(createInitialState(config));
 
   const currentLevel = useMemo(() => {
@@ -63,7 +64,7 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
     );
     const questionsInLevel = currentLevel.questions.length;
 
-    setState((prev) => ({ ...prev, submitting: true, feedback: null }));
+    setState((prev) => ({ ...prev, submitting: true, feedback: null, couplingDelta: 0 }));
 
     try {
       const response = await validateAnswer(
@@ -75,15 +76,17 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
 
       if (response.is_correct) {
         setState((prev) => {
-          const impact = resolveHealthImpact(response.health_impact);
-          const nextMeters = applyHealthImpact(prev.meters, impact);
+          const impact = resolveCouplingImpact(response.coupling_impact);
+          const previousScore = prev.coupling.coupling;
+          const nextCoupling = applyCouplingImpact(prev.coupling, impact);
+          const couplingDelta = nextCoupling.coupling - previousScore;
 
-          let nextCanvas = applyHldMutation(prev.canvas, response.uml_mutation);
+          let nextCanvas = applyMutation(prev.canvas, response.uml_mutation);
           let nextLevelIdx = prev.levelIdx;
           let nextQuestionIdx = prev.questionIdx + 1;
           let feedback = {
             isCorrect: true,
-            title: "Component placed",
+            title: "Refactoring applied",
             text: response.explanation,
           };
           let gameOver = false;
@@ -93,7 +96,7 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
             nextQuestionIdx = 0;
             feedback = {
               isCorrect: true,
-              title: "Tier complete",
+              title: "Level complete",
               text: response.explanation,
             };
             if (nextLevelIdx > config.total_levels) {
@@ -106,7 +109,8 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
           return {
             ...prev,
             canvas: nextCanvas,
-            meters: nextMeters,
+            coupling: nextCoupling,
+            couplingDelta,
             levelIdx: nextLevelIdx,
             questionIdx: nextQuestionIdx,
             gameOver,
@@ -120,16 +124,18 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
           ...prev,
           feedback: {
             isCorrect: false,
-            title: "Architecture risk detected",
+            title: "Code smell detected",
             text: `${response.skill_tag}: ${response.explanation}`,
           },
           submitting: false,
+          couplingDelta: 0,
         }));
       }
     } catch {
       setState((prev) => ({
         ...prev,
         submitting: false,
+        couplingDelta: 0,
         feedback: {
           isCorrect: false,
           title: "Network error",
@@ -142,11 +148,11 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
   return (
     <div className="min-h-screen bg-slate-950 p-6 font-sans text-slate-100">
       <div className="mx-auto max-w-6xl space-y-6">
-        <div className="space-y-4 rounded-xl border border-sky-900/50 bg-slate-900 p-4 shadow-md">
+        <div className="space-y-4 rounded-xl border border-violet-900/40 bg-slate-900 p-4 shadow-md">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-cyan-400">
-                HLD Session
+              <span className="text-xs font-bold uppercase tracking-wider text-violet-400">
+                Clean Code Session
               </span>
               <h2 className="text-xl font-extrabold">{config.system_title}</h2>
             </div>
@@ -158,7 +164,7 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
               Quit
             </button>
           </div>
-          <HealthMeters meters={state.meters} />
+          <CouplingMeter score={state.coupling.coupling} delta={state.couplingDelta} />
         </div>
 
         {!state.gameOver && currentQuestion ? (
@@ -170,17 +176,29 @@ export default function HldGameScreen({ systemId, config, onQuit }) {
             onSubmit={handleSubmit}
             submitting={state.submitting}
             feedback={state.feedback}
-            accent="sky"
+            accent="violet"
           />
         ) : (
-          <ChaosVictory
-            scenario={config.chaos_scenario}
-            metersHealthy={metersHealthy(state.meters)}
-            onQuit={onQuit}
-          />
+          <div className="space-y-3 rounded-xl border border-violet-800 bg-violet-950/30 p-8 text-center text-violet-200">
+            <h3 className="text-2xl font-black">Refactoring validated</h3>
+            <p className="mx-auto max-w-md text-sm text-violet-300/80">
+              Final coupling score: {state.coupling.coupling}/100 —{" "}
+              {couplingLabel(state.coupling.coupling)}.
+              {couplingHealthy(state.coupling.coupling)
+                ? " Your dependency graph is clean and extensible."
+                : " Good progress — review remaining coupling hotspots."}
+            </p>
+            <button
+              type="button"
+              onClick={onQuit}
+              className="mt-2 rounded-lg bg-violet-600 px-6 py-2 text-xs font-bold text-white transition-all hover:bg-violet-500"
+            >
+              Return to dashboard
+            </button>
+          </div>
         )}
 
-        <HldGameCanvas source={state.canvas} />
+        <CleanCodeGameCanvas source={state.canvas} />
       </div>
     </div>
   );

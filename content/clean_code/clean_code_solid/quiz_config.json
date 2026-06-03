@@ -1,0 +1,92 @@
+{
+    "system_id": "clean_code_solid",
+    "discipline": "clean_code",
+    "canvas_type": "classDiagram",
+    "system_title": "Clean Code & SOLID Mastery",
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Taming Tight Coupling (SRP & OCP)",
+            "description": "A monolithic OrderProcessor violates SRP and blocks extension. Extract responsibilities and introduce polymorphism.",
+            "initial_canvas": "classDiagram\nclass OrderProcessor {\n    +processOrder(Order o)\n    +calculateSalesTax(Order o)\n    +saveToMySQL(Order o)\n    +sendEmailConfirmation(Order o)\n}\nclass MySQLDB\nclass SMTPClient\nOrderProcessor --> MySQLDB : direct_write\nOrderProcessor --> SMTPClient : direct_send\n",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "Single Responsibility Principle (SRP)",
+                    "type": "checkbox",
+                    "text": "The current OrderProcessor class violates SRP by managing three distinct business reasons to change (Data Persistence, Notification Delivery, and Tax Calculations). Which TWO separate components should we isolate to cleanly refactor this layout?",
+                    "choices": [
+                        "An OrderRepository class tasked purely with structural database persistence mapping",
+                        "An abstract NotificationService managing channel delivery variants",
+                        "A global GlobalSingletonVariable holding active configuration metrics",
+                        "A CacheManager processing memory lookup tables"
+                    ],
+                    "correct_answer": [
+                        "An OrderRepository class tasked purely with structural database persistence mapping",
+                        "An abstract NotificationService managing channel delivery variants"
+                    ],
+                    "explanation": "Extracting persistence and notifications into their own dedicated classes separates core business logic from systemic infrastructure implementation concerns.",
+                    "uml_mutation": "classDiagram\nclass OrderProcessor {\n    -OrderRepository repo\n    -NotificationService notifier\n    +processOrder(Order o)\n}\nclass OrderRepository {\n    +save(Order o)\n}\nclass NotificationService {\n    +sendConfirmation(Order o)\n}\nOrderProcessor --> OrderRepository : delegates_saving\nOrderProcessor --> NotificationService : delegates_alerting\n",
+                    "coupling_impact": { "coupling": 18 }
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "Open-Closed Principle & Polymorphism",
+                    "type": "radio",
+                    "text": "The system needs to support expanding notification targets (Email, SMS, Slack pushing channels). To abide by the Open-Closed Principle (OCP), how should NotificationService be redesigned?",
+                    "choices": [
+                        "Add inside-method if/else conditional strings checking notification types sequentially",
+                        "Convert NotificationService into an interface, implementing concrete variants like EmailNotification and SMSNotification",
+                        "Create separate independent worker services for every unique communication channel without sharing abstractions"
+                    ],
+                    "correct_answer": "Convert NotificationService into an interface, implementing concrete variants like EmailNotification and SMSNotification",
+                    "explanation": "By leveraging polymorphism through an interface, the architecture becomes open for extension (adding new alert types) but remains closed for modification (no need to change existing OrderProcessor execution arrays).",
+                    "uml_mutation": "classDiagram\nclass OrderProcessor {\n    -OrderRepository repo\n    -NotificationService notifier\n    +processOrder(Order o)\n}\nclass OrderRepository {\n    +save(Order o)\n}\nclass NotificationService {\n    <<interface>>\n    +sendConfirmation(Order o)\n}\nclass EmailNotification {\n    +sendConfirmation(Order o)\n}\nclass SMSNotification {\n    +sendConfirmation(Order o)\n}\nNotificationService <|.. EmailNotification\nNotificationService <|.. SMSNotification\nOrderProcessor --> OrderRepository : delegates_saving\nOrderProcessor --> NotificationService : delegates_alerting\n",
+                    "coupling_impact": { "coupling": 22 }
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: KISS & YAGNI Simplification",
+            "description": "A cart total feature was over-engineered with factories and observers for requirements that do not exist yet. Strip the noise.",
+            "initial_canvas": "classDiagram\nclass CartTotalFacade {\n    +calculateTotal(Cart c)\n}\nclass CartCalculatorFactory {\n    +create(): AbstractCartCalculator\n}\nclass AbstractCartCalculator {\n    <<abstract>>\n    +calculate(Cart c)\n}\nclass StandardCartCalculator\nclass CartTotalObserver {\n    <<interface>>\n    +onTotalCalculated(double total)\n}\nclass AnalyticsObserver\nclass AuditObserver\nCartTotalFacade --> CartCalculatorFactory\nCartCalculatorFactory --> AbstractCartCalculator\nAbstractCartCalculator <|-- StandardCartCalculator\nCartTotalFacade --> CartTotalObserver\nCartTotalObserver <|.. AnalyticsObserver\nCartTotalObserver <|.. AuditObserver\n",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "YAGNI (You Aren't Gonna Need It)",
+                    "type": "checkbox",
+                    "text": "The requirement is only: return the sum of item prices in a cart. Which TWO layers are speculative abstractions that violate YAGNI and should be removed first?",
+                    "choices": [
+                        "CartCalculatorFactory and AbstractCartCalculator hierarchy",
+                        "CartTotalObserver with AnalyticsObserver and AuditObserver",
+                        "A single CartTotalService with one calculateTotal method",
+                        "Unit tests for the cart sum"
+                    ],
+                    "correct_answer": [
+                        "CartCalculatorFactory and AbstractCartCalculator hierarchy",
+                        "CartTotalObserver with AnalyticsObserver and AuditObserver"
+                    ],
+                    "explanation": "Factories and observer networks solve problems you do not have yet. YAGNI says delete them until a real extension point is required.",
+                    "uml_mutation": "classDiagram\nclass CartTotalFacade {\n    +calculateTotal(Cart c)\n}\nclass StandardCartCalculator {\n    +calculate(Cart c): double\n}\nCartTotalFacade --> StandardCartCalculator\n",
+                    "coupling_impact": { "coupling": 20 }
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "KISS (Keep It Simple, Stupid)",
+                    "type": "radio",
+                    "text": "After removing speculative layers, what is the simplest design that still satisfies the requirement cleanly?",
+                    "choices": [
+                        "Keep CartTotalFacade delegating to StandardCartCalculator",
+                        "Replace the hierarchy with one CartTotalService exposing calculateTotal(Cart c)",
+                        "Move all logic into a static method on the Cart entity plus a database trigger"
+                    ],
+                    "correct_answer": "Replace the hierarchy with one CartTotalService exposing calculateTotal(Cart c)",
+                    "explanation": "KISS favors the smallest structure that is easy to read and test. One service with one method beats a facade wrapping a leftover class from a deleted factory.",
+                    "uml_mutation": "classDiagram\nclass CartTotalService {\n    +calculateTotal(Cart c): double\n}\nclass Cart {\n    -items: List\n}\nCartTotalService ..> Cart : reads\n",
+                    "coupling_impact": { "coupling": 25 }
+                }
+            ]
+        }
+    ]
+}

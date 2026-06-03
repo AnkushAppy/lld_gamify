@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { formatSelectedForApi, hasSelection, toggleChoice } from "../answerUtils.js";
 import { validateAnswer } from "../api.js";
 import { applyMutation } from "../canvasEngine.js";
+import { resolveLevelCanvas } from "../mutationEngine.js";
 import LldGameCanvas from "./LldGameCanvas.jsx";
 import QuestionPanel from "./QuestionPanel.jsx";
 
@@ -12,7 +13,7 @@ function createInitialState(config) {
     levelIdx: 1,
     questionIdx: 0,
     score: 0,
-    canvas: config.initial_canvas,
+    canvas: resolveLevelCanvas(config, 1),
     gameOver: false,
     selectedChoices: [],
     feedback: null,
@@ -59,7 +60,7 @@ export default function LldGameScreen({ systemId, config, onQuit }) {
       );
 
       if (response.is_correct) {
-        const nextCanvas = applyMutation(state.canvas, response.uml_mutation);
+        let nextCanvas = applyMutation(state.canvas, response.uml_mutation);
         const questionsInLevel = currentLevel.questions.length;
         let nextLevelIdx = state.levelIdx;
         let nextQuestionIdx = state.questionIdx + 1;
@@ -80,6 +81,8 @@ export default function LldGameScreen({ systemId, config, onQuit }) {
           };
           if (nextLevelIdx > config.total_levels) {
             gameOver = true;
+          } else if (config.levels[nextLevelIdx - 1]?.initial_canvas) {
+            nextCanvas = config.levels[nextLevelIdx - 1].initial_canvas;
           }
         }
 

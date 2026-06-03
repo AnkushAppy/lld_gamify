@@ -1,0 +1,18 @@
+{
+  "tracks": [
+    {
+      "system_id": "clean_code_solid",
+      "icon": "✨",
+      "title": "Clean Code & SOLID Mastery",
+      "tagline": "SRP, OCP, polymorphism, KISS, and YAGNI through live refactoring.",
+      "available": true
+    },
+    {
+      "system_id": "clean_code_polymorphism",
+      "icon": "🔀",
+      "title": "Polymorphism & Abstraction",
+      "tagline": "Runtime vs compile-time polymorphism, LSP, strategy, and OCP.",
+      "available": true
+    }
+  ]
+}

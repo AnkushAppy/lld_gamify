@@ -17,12 +17,19 @@ export default function QuestionPanel({
           input: "accent-sky-500",
           badge: "border-sky-800 bg-sky-950 text-sky-400",
         }
-      : {
-          selected: "border-orange-500 bg-orange-950/40 text-orange-200",
-          button: "from-orange-600 to-amber-600",
-          input: "accent-orange-500",
-          badge: "border-sky-800 bg-sky-950 text-sky-400",
-        };
+      : accent === "violet"
+        ? {
+            selected: "border-violet-500 bg-violet-950/40 text-violet-200",
+            button: "from-violet-600 to-purple-600",
+            input: "accent-violet-500",
+            badge: "border-violet-800 bg-violet-950 text-violet-400",
+          }
+        : {
+            selected: "border-orange-500 bg-orange-950/40 text-orange-200",
+            button: "from-orange-600 to-amber-600",
+            input: "accent-orange-500",
+            badge: "border-sky-800 bg-sky-950 text-sky-400",
+          };
 
   const canSubmit = selectedChoices.length > 0 && !submitting;
 

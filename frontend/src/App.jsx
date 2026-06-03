@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchSystems, startGame } from "./api.js";
+import CleanCodeGameScreen from "./components/CleanCodeGameScreen.jsx";
 import Dashboard from "./components/Dashboard.jsx";
 import HldGameScreen from "./components/HldGameScreen.jsx";
 import LldGameScreen from "./components/LldGameScreen.jsx";
@@ -55,6 +56,16 @@ export default function App() {
     if (config.discipline === "hld") {
       return (
         <HldGameScreen
+          systemId={selectedSystemId}
+          config={config}
+          onQuit={handleQuitGame}
+        />
+      );
+    }
+
+    if (config.discipline === "clean_code") {
+      return (
+        <CleanCodeGameScreen
           systemId={selectedSystemId}
           config={config}
           onQuit={handleQuitGame}

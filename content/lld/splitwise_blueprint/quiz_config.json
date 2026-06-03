@@ -33,7 +33,7 @@
                     ],
                     "correct_answer": "- String email (Private field with a getter, but no setter)",
                     "explanation": "Private visibility combined with a getter ensures runtime immutability and guards structural invariants, preventing unauthorized alteration of the user's core identity data.",
-                    "uml_mutation": "class User {\n    -String userId\n    -String email\n    +getEmail() : String\n}\n"
+                    "uml_mutation": "class User {\n    -String userId\n    +getUserId() : String\n    -String email\n    +getEmail() : String\n}\n"
                 },
                 {
                     "question_id": "l1_q3",
@@ -63,20 +63,20 @@
                     "explanation": "Enums enforce compile-time type safety. They constrain the domain state space to an explicit pool of valid options, completely eliminating systemic typo errors (like 'EQAUL' instead of 'EQUAL').",
                     "uml_mutation": "class ExpenseType {\n    <<enumeration>>\n    EQUAL\n    EXACT\n    PERCENT\n}\nExpense --> ExpenseType : categorized_by\n"
                 },
-                {
-                    "question_id": "l1_q5",
-                    "skill_tag": "State Modeling",
-                    "type": "radio",
-                    "text": "An Expense is divided into granular portions allocated to specific users. What core leaf entity captures the specific amount owed by an individual for a single Expense?",
-                    "choices": [
-                        "Split",
-                        "DoubleAmount",
-                        "OweString"
-                    ],
-                    "correct_answer": "Split",
-                    "explanation": "A 'Split' is a fundamental Value Object/Entity representing the calculated or exact portion of an expense owed by one specific user.",
-                    "uml_mutation": "class Split {\n    -double amount\n    +getAmount() : double\n    +setAmount(double amount)\n}\n"
-                }
+{
+                     "question_id": "l1_q5",
+                     "skill_tag": "State Modeling",
+                     "type": "radio",
+                     "text": "An Expense is divided into granular portions allocated to specific users. What core leaf entity captures the specific amount owed by an individual for a single Expense?",
+                     "choices": [
+                         "Split",
+                         "DoubleAmount",
+                         "OweString"
+                     ],
+                     "correct_answer": "Split",
+                     "explanation": "A 'Split' is a fundamental Value Object representing the calculated or exact portion of an expense owed by one specific user. As a Value Object, it is immutable once created.",
+                     "uml_mutation": "class Split {\n    -double amount\n    +getAmount() : double\n}\n"
+                 }
             ]
         },
         {
@@ -138,7 +138,7 @@
                     ],
                     "correct_answer": "Make Split an abstract class and create specific subclasses like `PercentSplit`, `ExactSplit`, and `EqualSplit`.",
                     "explanation": "Polymorphism ensures different split configurations are encapsulated in their own subclasses. This prevents bloated classes with unused variables and makes extending new split rules (e.g., 'SharesSplit') seamless.",
-                    "uml_mutation": "class Split {\n    <<abstract>>\n}\nclass EqualSplit\nclass ExactSplit\nclass PercentSplit {\n    -double percent\n}\nSplit <|-- EqualSplit\nSplit <|-- ExactSplit\nSplit <|-- PercentSplit\n"
+                    "uml_mutation": "class Split {\n    <<abstract>>\n    -double amount\n    +getAmount() : double\n}\nclass EqualSplit\nclass ExactSplit\nclass PercentSplit {\n    -double percent\n}\nSplit <|-- EqualSplit\nSplit <|-- ExactSplit\nSplit <|-- PercentSplit\n"
                 }
             ]
         },

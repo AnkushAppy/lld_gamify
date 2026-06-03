@@ -1,31 +1,30 @@
+import { appendLines, applyMutationMode, normalizeCanvas } from "./mutationEngine.js";
+
 const HLD_CANVAS_HEADER = "flowchart TD\n";
 const HLD_PLACEHOLDER =
-  'placeholder["Answer questions to assemble the architecture"]';
+  'placeholder["Start"]';
 
 export function initHldCanvas() {
   return `${HLD_CANVAS_HEADER}    ${HLD_PLACEHOLDER}\n`;
 }
 
-function appendLine(canvas, line) {
-  const trimmed = line.trim();
-  if (!trimmed || canvas.includes(trimmed)) return canvas;
-  if (!canvas.endsWith("\n")) canvas += "\n";
-  return `${canvas}${trimmed}\n`;
-}
-
-export function applyHldMutation(canvas, mutation) {
-  if (!mutation?.trim()) return canvas;
-
+function applyIncremental(canvas, mutation) {
   let nextCanvas =
     canvas === HLD_CANVAS_HEADER || canvas.includes(HLD_PLACEHOLDER)
       ? HLD_CANVAS_HEADER
       : canvas;
 
-  for (const line of mutation.trim().split("\n")) {
-    nextCanvas = appendLine(nextCanvas, line);
-  }
+  return appendLines(nextCanvas, mutation);
+}
 
-  return nextCanvas;
+export function applyHldMutation(canvas, mutation) {
+  if (!mutation?.trim()) return canvas;
+
+  const { canvas: staged, mode } = applyMutationMode(canvas, mutation);
+  if (mode === "snapshot") return normalizeCanvas(mutation);
+  if (mode === "style") return staged;
+
+  return applyIncremental(canvas, mutation);
 }
 
 export const HLD_METER_DEFAULTS = {
@@ -34,12 +33,31 @@ export const HLD_METER_DEFAULTS = {
   cost: 35,
 };
 
+export const DEFAULT_HEALTH_IMPACT = {
+  availability: 8,
+  latency: -15,
+  cost: 5,
+};
+
+export function resolveHealthImpact(apiImpact) {
+  if (apiImpact && Object.keys(apiImpact).length > 0) {
+    return apiImpact;
+  }
+  return DEFAULT_HEALTH_IMPACT;
+}
+
 export function applyHealthImpact(meters, impact) {
-  if (!impact) return meters;
+  if (!impact) {
+    return { ...meters };
+  }
   return {
-    availability: clamp(meters.availability + (impact.availability ?? 0), 0, 100),
-    latency: clamp(meters.latency + (impact.latency ?? 0), 20, 500),
-    cost: clamp(meters.cost + (impact.cost ?? 0), 0, 100),
+    availability: clamp(
+      (meters.availability ?? 0) + (impact.availability ?? 0),
+      0,
+      100,
+    ),
+    latency: clamp((meters.latency ?? 0) + (impact.latency ?? 0), 20, 500),
+    cost: clamp((meters.cost ?? 0) + (impact.cost ?? 0), 0, 100),
   };
 }
 

@@ -18,6 +18,7 @@
             "level_index": 1,
             "title": "Level 1: Escaping the Monolithic Bottleneck",
             "description": "The legacy system consists of a single server and mobile apps that constantly poll via HTTP. Fix the ingress layer to prevent connection exhaustion and SPOFs.",
+            "initial_canvas": "flowchart TD\n    client((Mobile Apps)) --> monolith[Monolith Core App]\n    monolith --> db[(Single Shared DB)]\n    style monolith fill:#7f1d1d,stroke:#991b1b,stroke-width:3px\n    style db fill:#7f1d1d,stroke:#991b1b,stroke-width:3px\n",
             "questions": [
                 {
                     "question_id": "l1_q1",
@@ -31,7 +32,7 @@
                     ],
                     "correct_answer": "Introduce a Global Load Balancer pointing to an API Gateway backed by an auto-scaling group",
                     "explanation": "A Global Load Balancer removes the SPOF at ingress, dynamically routing traffic to healthy instances in an auto-scaling group via an API Gateway.",
-                    "uml_mutation": "    client((Mobile Apps)) --> glb[Global Load Balancer]\n    glb --> api[API Gateway]\n",
+                    "uml_mutation": "flowchart TD\n    client((Mobile Apps)) --> glb[Global Load Balancer]\n    glb --> api[API Gateway]\n    api --> monolith[Monolith Core App]\n    monolith --> db[(Single Shared DB)]\n    style monolith fill:#7f1d1d,stroke:#991b1b,stroke-width:3px\n    style db fill:#7f1d1d,stroke:#991b1b,stroke-width:3px\n    style glb fill:#065f46,stroke:#34d399,stroke-width:2px\n    style api fill:#065f46,stroke:#34d399,stroke-width:2px\n",
                     "health_impact": { "availability": 15, "latency": -2, "cost": 4 }
                 },
                 {
@@ -46,7 +47,7 @@
                     ],
                     "correct_answer": "Persistent WebSockets",
                     "explanation": "WebSockets maintain a long-lived, persistent, bi-directional TCP connection. This entirely eliminates the CPU-intensive HTTP handshake overhead for high-frequency location streaming.",
-                    "uml_mutation": "    api --> ws[WebSocket Cluster]\n",
+                    "uml_mutation": "flowchart TD\n    client((Mobile Apps)) --> glb[Global Load Balancer]\n    glb --> api[API Gateway]\n    api --> ws[WebSocket Cluster]\n    ws --> monolith[Monolith Core App]\n    monolith --> db[(Single Shared DB)]\n    style monolith fill:#7f1d1d,stroke:#991b1b,stroke-width:3px\n    style db fill:#7f1d1d,stroke:#991b1b,stroke-width:3px\n    style ws fill:#065f46,stroke:#34d399,stroke-width:2px\n    style glb fill:#065f46,stroke:#34d399,stroke-width:2px\n    style api fill:#065f46,stroke:#34d399,stroke-width:2px\n",
                     "health_impact": { "availability": 8, "latency": -35, "cost": 5 }
                 },
                 {
@@ -61,7 +62,7 @@
                     ],
                     "correct_answer": "Publish the pings to a high-throughput event stream (like Apache Kafka)",
                     "explanation": "Kafka acts as a highly durable shock absorber. It decouples the fast ingestion of GPS data from the slower downstream processing services, preventing system overload.",
-                    "uml_mutation": "    ws --> kafka[[Kafka Event Stream]]\n",
+                    "uml_mutation": "flowchart TD\n    client((Mobile Apps)) --> glb[Global Load Balancer]\n    glb --> api[API Gateway]\n    api --> ws[WebSocket Cluster]\n    ws --> kafka[[Kafka Event Stream]]\n    kafka --> worker[Location Ingest Worker]\n    worker --> db[(Single Shared DB)]\n    style db fill:#7f1d1d,stroke:#991b1b,stroke-width:3px\n    style ws fill:#065f46,stroke:#34d399,stroke-width:2px\n    style kafka fill:#065f46,stroke:#34d399,stroke-width:2px\n    style worker fill:#065f46,stroke:#34d399,stroke-width:2px\n",
                     "health_impact": { "availability": 12, "latency": -10, "cost": 6 }
                 }
             ]
@@ -70,6 +71,7 @@
             "level_index": 2,
             "title": "Level 2: Fixing the Database Meltdown",
             "description": "The legacy system uses a single MySQL database for everything. Queries are locking, and spatial lookups are timing out.",
+            "initial_canvas": "flowchart TD\n    client((Mobile Apps)) --> glb[Global Load Balancer]\n    glb --> api[API Gateway]\n    api --> ws[WebSocket Cluster]\n    ws --> kafka[[Kafka Event Stream]]\n    kafka --> worker[Location Ingest Worker]\n    worker --> db[(Single Shared DB)]\n    style db fill:#7f1d1d,stroke:#991b1b,stroke-width:3px\n    style ws fill:#065f46,stroke:#34d399\n    style kafka fill:#065f46,stroke:#34d399\n",
             "questions": [
                 {
                     "question_id": "l2_q1",

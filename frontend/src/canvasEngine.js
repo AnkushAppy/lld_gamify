@@ -1,8 +1,14 @@
+import {
+  appendLines,
+  applyMutationMode,
+  normalizeCanvas,
+} from "./mutationEngine.js";
+
 const CANVAS_HEADER = "classDiagram\n";
-const PLACEHOLDER_NOTE = 'note "Answer questions to assemble the blueprint"';
+const PLACEHOLDER_NOTE = 'note "Start"';
 
 export function initCanvas() {
-  return `${CANVAS_HEADER}note "Answer questions to assemble the blueprint"\n`;
+  return `${CANVAS_HEADER}note "Start"\n`;
 }
 
 function normalizeEmptyClass(mutation) {
@@ -48,15 +54,7 @@ function replaceOrAppendClass(canvas, className, classBlock) {
   return canvas + classBlock;
 }
 
-function appendLine(canvas, line) {
-  const trimmed = line.trim();
-  if (!trimmed || canvas.includes(trimmed)) return canvas;
-  return `${canvas}${trimmed}\n`;
-}
-
-export function applyMutation(canvas, mutation) {
-  if (!mutation?.trim()) return canvas;
-
+function applyIncremental(canvas, mutation) {
   let nextCanvas =
     canvas === CANVAS_HEADER || canvas.includes(PLACEHOLDER_NOTE)
       ? CANVAS_HEADER
@@ -82,9 +80,19 @@ export function applyMutation(canvas, mutation) {
       newlineIndex === -1 ? remaining : remaining.slice(0, newlineIndex);
     remaining = newlineIndex === -1 ? "" : remaining.slice(newlineIndex + 1);
     if (line.trim()) {
-      nextCanvas = appendLine(nextCanvas, line);
+      nextCanvas = appendLines(nextCanvas, line);
     }
   }
 
   return nextCanvas;
+}
+
+export function applyMutation(canvas, mutation) {
+  if (!mutation?.trim()) return canvas;
+
+  const { canvas: staged, mode } = applyMutationMode(canvas, mutation);
+  if (mode === "snapshot") return normalizeCanvas(mutation);
+  if (mode === "style") return staged;
+
+  return applyIncremental(canvas, mutation);
 }

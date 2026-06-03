@@ -1,0 +1,236 @@
+{
+    "system_id": "clean_code_polymorphism",
+    "discipline": "clean_code",
+    "canvas_type": "classDiagram",
+    "system_title": "Polymorphism & Abstraction Mastery",
+    "levels": [
+        {
+            "level_index": 1,
+            "title": "Level 1: Runtime Polymorphism — Replace Conditionals",
+            "description": "Polymorphism at runtime means the correct behavior is chosen through a shared contract (interface or abstract class), not through if/else or switch on type strings. Refactor tight coupling into plug-in strategies.",
+            "initial_canvas": "classDiagram\nclass PaymentProcessor {\n    +process(String type, double amount)\n}\nclass CreditCardPayment {\n    +chargeCard(double amount)\n}\nclass PayPalPayment {\n    +transferFunds(double amount)\n}\nPaymentProcessor --> CreditCardPayment : if_type_equals_card\nPaymentProcessor --> PayPalPayment : if_type_equals_paypal\nstyle PaymentProcessor fill:#7f1d1d,stroke:#991b1b,stroke-width:2px\n",
+            "questions": [
+                {
+                    "question_id": "l1_q1",
+                    "skill_tag": "Subtype Polymorphism via Interfaces",
+                    "type": "radio",
+                    "text": "PaymentProcessor uses switch(type) to call chargeCard() or transferFunds(). Which refactor lets you add new payment types without editing PaymentProcessor?",
+                    "choices": [
+                        "Introduce a PaymentStrategy interface with a unified execute(double amount) method that all payment classes implement",
+                        "Rename both payment classes to PaymentUtil and merge their methods into one class",
+                        "Add more branches to the switch statement and document each type in a wiki"
+                    ],
+                    "correct_answer": "Introduce a PaymentStrategy interface with a unified execute(double amount) method that all payment classes implement",
+                    "explanation": "Runtime polymorphism through an interface lets the processor depend on behavior, not concrete types. New payment classes implement the same contract and plug in without touching orchestration code.",
+                    "uml_mutation": "classDiagram\nclass PaymentProcessor {\n    -PaymentStrategy strategy\n    +process(double amount)\n}\nclass PaymentStrategy {\n    <<interface>>\n    +execute(double amount)\n}\nclass CreditCardPayment {\n    +execute(double amount)\n}\nclass PayPalPayment {\n    +execute(double amount)\n}\nPaymentStrategy <|.. CreditCardPayment\nPaymentStrategy <|.. PayPalPayment\nPaymentProcessor --> PaymentStrategy : depends_on_abstraction\n",
+                    "coupling_impact": { "coupling": 18 }
+                },
+                {
+                    "question_id": "l1_q2",
+                    "skill_tag": "Runtime Method Overriding",
+                    "type": "checkbox",
+                    "text": "Concrete classes now implement PaymentStrategy.execute(). Which TWO practices prevent silent override bugs at compile time?",
+                    "choices": [
+                        "Mark implementing methods with @Override (or the language equivalent) so the compiler verifies the signature",
+                        "Keep subclass method visibility at least as accessible as the interface method (public stays public)",
+                        "Rename execute() to executePayment() in one subclass only to clarify intent",
+                        "Declare interface methods private so each subclass can define its own visibility"
+                    ],
+                    "correct_answer": [
+                        "Mark implementing methods with @Override (or the language equivalent) so the compiler verifies the signature",
+                        "Keep subclass method visibility at least as accessible as the interface method (public stays public)"
+                    ],
+                    "explanation": "@Override catches typos and signature drift early. Narrowing visibility breaks substitutability — code expecting PaymentStrategy would fail when given a subclass that hides the method.",
+                    "uml_mutation": "classDiagram\nclass PaymentProcessor {\n    -PaymentStrategy strategy\n    +process(double amount)\n}\nclass PaymentStrategy {\n    <<interface>>\n    +execute(double amount)\n}\nclass CreditCardPayment {\n    +execute(double amount) Override\n}\nclass PayPalPayment {\n    +execute(double amount) Override\n}\nPaymentStrategy <|.. CreditCardPayment\nPaymentStrategy <|.. PayPalPayment\nPaymentProcessor --> PaymentStrategy : depends_on_abstraction\nstyle CreditCardPayment fill:#10b981,stroke:#047857\nstyle PayPalPayment fill:#10b981,stroke:#047857\n",
+                    "coupling_impact": { "coupling": 16 }
+                },
+                {
+                    "question_id": "l1_q3",
+                    "skill_tag": "Open-Closed Principle (OCP)",
+                    "type": "radio",
+                    "text": "Product requests CryptoPayment support. With polymorphism in place, what is the correct change?",
+                    "choices": [
+                        "Add CryptoPayment as a new class implementing PaymentStrategy; PaymentProcessor stays unchanged",
+                        "Open PaymentProcessor and add another switch branch for crypto",
+                        "Delete PaymentStrategy and copy-paste execute() logic into PaymentProcessor"
+                    ],
+                    "correct_answer": "Add CryptoPayment as a new class implementing PaymentStrategy; PaymentProcessor stays unchanged",
+                    "explanation": "OCP in action: extend by adding a new implementation class. The client (PaymentProcessor) continues to call execute() on the interface — zero modification risk to production orchestration.",
+                    "uml_mutation": "classDiagram\nclass PaymentProcessor {\n    -PaymentStrategy strategy\n    +process(double amount)\n}\nclass PaymentStrategy {\n    <<interface>>\n    +execute(double amount)\n}\nclass CreditCardPayment {\n    +execute(double amount)\n}\nclass PayPalPayment {\n    +execute(double amount)\n}\nclass CryptoPayment {\n    +execute(double amount)\n}\nPaymentStrategy <|.. CreditCardPayment\nPaymentStrategy <|.. PayPalPayment\nPaymentStrategy <|.. CryptoPayment\nPaymentProcessor --> PaymentStrategy : depends_on_abstraction\nstyle CryptoPayment fill:#f59e0b,stroke:#b45309\nstyle CreditCardPayment fill:#10b981,stroke:#047857\nstyle PayPalPayment fill:#10b981,stroke:#047857\n",
+                    "coupling_impact": { "coupling": 20 }
+                }
+            ]
+        },
+        {
+            "level_index": 2,
+            "title": "Level 2: Compile-Time Polymorphism — Method Overloading",
+            "description": "Compile-time polymorphism (method overloading) resolves the correct method at compile time based on parameter types and arity — within a single class. It is not substitutable runtime polymorphism; know when each applies.",
+            "initial_canvas": "classDiagram\nclass ReportExporter {\n    +export(Object data, String format, boolean compress, int version)\n}\nclass Report\nReportExporter --> Report : reads\nstyle ReportExporter fill:#7f1d1d,stroke:#991b1b,stroke-width:2px\n",
+            "questions": [
+                {
+                    "question_id": "l2_q1",
+                    "skill_tag": "Compile-Time vs Runtime Polymorphism",
+                    "type": "radio",
+                    "text": "A teammate suggests using method overloading in ReportExporter: export(Report), export(Report, PDFOptions), export(Report, CSVOptions). What kind of polymorphism is this?",
+                    "choices": [
+                        "Compile-time polymorphism (static overloading) — the compiler picks the method by signature at build time",
+                        "Runtime polymorphism (dynamic overriding) — the JVM picks the method while the program is running based on object type",
+                        "Neither — overloading is just syntactic sugar with no design meaning"
+                    ],
+                    "correct_answer": "Compile-time polymorphism (static overloading) — the compiler picks the method by signature at build time",
+                    "explanation": "Overloading binds at compile time within one class. Overriding binds at runtime when a subclass replaces a parent or interface method. Confusing the two leads to fragile designs.",
+                    "uml_mutation": "classDiagram\nclass ReportExporter {\n    +export(Report report)\n    +export(Report report, PDFOptions opts)\n    +export(Report report, CSVOptions opts)\n}\nclass Report\nclass PDFOptions\nclass CSVOptions\nReportExporter ..> Report\nReportExporter ..> PDFOptions\nReportExporter ..> CSVOptions\n",
+                    "coupling_impact": { "coupling": 14 }
+                },
+                {
+                    "question_id": "l2_q2",
+                    "skill_tag": "When to Use Overloading",
+                    "type": "checkbox",
+                    "text": "Which TWO situations are appropriate uses of method overloading rather than an interface hierarchy?",
+                    "choices": [
+                        "Convenience defaults: export(report) delegates to export(report, defaultOptions)",
+                        "Same operation, different parameter shapes in one cohesive class (e.g., format-specific option types)",
+                        "Adding a completely new payment provider that must plug in without recompiling the processor",
+                        "Replacing a switch on class type inside a loop over unrelated subclasses"
+                    ],
+                    "correct_answer": [
+                        "Convenience defaults: export(report) delegates to export(report, defaultOptions)",
+                        "Same operation, different parameter shapes in one cohesive class (e.g., format-specific option types)"
+                    ],
+                    "explanation": "Overloading suits variations of one responsibility in a single class. Plug-in behavior across types that evolve independently belongs to runtime polymorphism via interfaces.",
+                    "uml_mutation": "classDiagram\nclass ReportExporter {\n    +export(Report report)\n    +export(Report report, PDFOptions opts)\n    +export(Report report, CSVOptions opts)\n    -exportInternal(Report report, FormatOptions opts)\n}\nclass Report\nclass PDFOptions\nclass CSVOptions\nclass FormatOptions {\n    <<interface>>\n}\nPDFOptions ..|> FormatOptions\nCSVOptions ..|> FormatOptions\nReportExporter ..> Report\nstyle ReportExporter fill:#10b981,stroke:#047857\n",
+                    "coupling_impact": { "coupling": 16 }
+                },
+                {
+                    "question_id": "l2_q3",
+                    "skill_tag": "Overloading Limits",
+                    "type": "radio",
+                    "text": "The team adds export(Report, String format) alongside export(Report, PDFOptions). Call sites become ambiguous and bugs slip in. What is the clean-code fix?",
+                    "choices": [
+                        "Remove the String overload; use typed option objects or an enum Format so the compiler can distinguish signatures safely",
+                        "Add more String overloads for every format until developers memorize the order",
+                        "Convert ReportExporter into an abstract class with one abstract export method per format"
+                    ],
+                    "correct_answer": "Remove the String overload; use typed option objects or an enum Format so the compiler can distinguish signatures safely",
+                    "explanation": "Overloading fails when parameters are too similar (String vs String). Prefer strong types or enums. If formats behave differently at runtime with plug-in extensibility, switch to a Strategy interface instead.",
+                    "uml_mutation": "classDiagram\nclass ReportExporter {\n    +export(Report report, Format format)\n    +export(Report report, PDFOptions opts)\n    +export(Report report, CSVOptions opts)\n}\nclass Format {\n    <<enumeration>>\n    PDF\n    CSV\n    JSON\n}\nclass Report\nclass PDFOptions\nclass CSVOptions\nReportExporter ..> Format\nstyle ReportExporter fill:#10b981,stroke:#047857\n",
+                    "coupling_impact": { "coupling": 12 }
+                }
+            ]
+        },
+        {
+            "level_index": 3,
+            "title": "Level 3: Inheritance Polymorphism & Liskov Substitution",
+            "description": "Subtype polymorphism through inheritance lets clients treat subclasses as their parent type. Liskov Substitution Principle (LSP) requires subclasses to honor the parent's contract without surprising behavior.",
+            "initial_canvas": "classDiagram\nclass BillingService {\n    +charge(Employee employee, double hours)\n}\nclass Employee {\n    +calculatePay(double hours): double\n}\nclass SalariedEmployee {\n    +calculatePay(double hours): double\n}\nclass Contractor {\n    +calculatePay(double hours): double\n}\nclass Intern {\n    +calculatePay(double hours): double\n}\nBillingService --> SalariedEmployee\nBillingService --> Contractor\nBillingService --> Intern\nstyle BillingService fill:#7f1d1d,stroke:#991b1b,stroke-width:2px\n",
+            "questions": [
+                {
+                    "question_id": "l3_q1",
+                    "skill_tag": "Programming to an Abstraction",
+                    "type": "radio",
+                    "text": "BillingService currently depends on three concrete employee classes. What refactor lets charge() work for any employee type present or future?",
+                    "choices": [
+                        "Make BillingService depend on Employee (abstract base or interface) and call calculatePay() polymorphically",
+                        "Add a fourth copy of charge() logic for each new employee type inside BillingService",
+                        "Store employees as JSON strings and parse type at runtime inside charge()"
+                    ],
+                    "correct_answer": "Make BillingService depend on Employee (abstract base or interface) and call calculatePay() polymorphically",
+                    "explanation": "The client should depend on the shared Employee abstraction. Each subtype overrides calculatePay() with its own rules while BillingService stays a single loop.",
+                    "uml_mutation": "classDiagram\nclass BillingService {\n    +charge(Employee employee, double hours)\n}\nclass Employee {\n    <<abstract>>\n    +calculatePay(double hours): double\n}\nclass SalariedEmployee {\n    +calculatePay(double hours): double\n}\nclass Contractor {\n    +calculatePay(double hours): double\n}\nclass Intern {\n    +calculatePay(double hours): double\n}\nEmployee <|-- SalariedEmployee\nEmployee <|-- Contractor\nEmployee <|-- Intern\nBillingService --> Employee : polymorphic_call\n",
+                    "coupling_impact": { "coupling": 18 }
+                },
+                {
+                    "question_id": "l3_q2",
+                    "skill_tag": "Liskov Substitution Principle (LSP)",
+                    "type": "checkbox",
+                    "text": "A subclass Intern.calculatePay() throws an exception when hours > 8, while Employee's contract implies pay is always computable. Which TWO statements describe the LSP violation and fix?",
+                    "choices": [
+                        "Subclasses must not strengthen preconditions or weaken postconditions in ways that break callers expecting Employee behavior",
+                        "Replace the throws with valid pay logic for overtime rules, or model Intern outside the Employee hierarchy if rules differ fundamentally",
+                        "LSP only applies to interfaces, not abstract classes, so Intern may behave however it wants",
+                        "Fix LSP by making calculatePay() return null instead of throwing"
+                    ],
+                    "correct_answer": [
+                        "Subclasses must not strengthen preconditions or weaken postconditions in ways that break callers expecting Employee behavior",
+                        "Replace the throws with valid pay logic for overtime rules, or model Intern outside the Employee hierarchy if rules differ fundamentally"
+                    ],
+                    "explanation": "LSP means any Employee reference must work wherever Employee is expected. Surprise exceptions or stricter rules break BillingService. Either honor the contract or use composition/separate types.",
+                    "uml_mutation": "classDiagram\nclass BillingService {\n    +charge(Employee employee, double hours)\n}\nclass Employee {\n    <<abstract>>\n    +calculatePay(double hours): double\n}\nclass SalariedEmployee {\n    +calculatePay(double hours): double\n}\nclass Contractor {\n    +calculatePay(double hours): double\n}\nclass Intern {\n    +calculatePay(double hours): double\n}\nEmployee <|-- SalariedEmployee\nEmployee <|-- Contractor\nEmployee <|-- Intern\nBillingService --> Employee : polymorphic_call\nstyle SalariedEmployee fill:#10b981,stroke:#047857\nstyle Contractor fill:#10b981,stroke:#047857\nstyle Intern fill:#10b981,stroke:#047857\n",
+                    "coupling_impact": { "coupling": 16 }
+                },
+                {
+                    "question_id": "l3_q3",
+                    "skill_tag": "Abstract Class vs Interface",
+                    "type": "radio",
+                    "text": "Employee needs a shared validateTimesheet() implementation reused by all subtypes, plus a subtype-specific calculatePay(). Which abstraction fits best?",
+                    "choices": [
+                        "Abstract class Employee with concrete validateTimesheet() and abstract calculatePay()",
+                        "Interface Employee with default validateTimesheet() only — no fields allowed anywhere",
+                        "Final class Employee with public static calculatePayFor(type, hours) switch method"
+                    ],
+                    "correct_answer": "Abstract class Employee with concrete validateTimesheet() and abstract calculatePay()",
+                    "explanation": "Abstract classes share code and state across a true IS-A hierarchy. Interfaces excel at pure behavior contracts. Mixed shared logic plus overriding favors an abstract base; pure plug-in behavior favors interfaces.",
+                    "uml_mutation": "classDiagram\nclass BillingService {\n    +charge(Employee employee, double hours)\n}\nclass Employee {\n    <<abstract>>\n    +validateTimesheet(): boolean\n    +calculatePay(double hours): double\n}\nclass SalariedEmployee {\n    +calculatePay(double hours): double\n}\nclass Contractor {\n    +calculatePay(double hours): double\n}\nclass Intern {\n    +calculatePay(double hours): double\n}\nEmployee <|-- SalariedEmployee\nEmployee <|-- Contractor\nEmployee <|-- Intern\nBillingService --> Employee : polymorphic_call\nstyle Employee fill:#065f46,stroke:#34d399\n",
+                    "coupling_impact": { "coupling": 14 }
+                }
+            ]
+        },
+        {
+            "level_index": 4,
+            "title": "Level 4: Composing Polymorphism — Strategy, Factory & Injection",
+            "description": "Production systems compose polymorphism: a factory or registry selects the concrete strategy at runtime, and dependency injection supplies it to the client. The client never instantiates concrete types.",
+            "initial_canvas": "classDiagram\nclass CheckoutController {\n    +checkout(Cart cart)\n    -new CreditCardPayment()\n    -new PayPalPayment()\n}\nclass CreditCardPayment {\n    +execute(double amount)\n}\nclass PayPalPayment {\n    +execute(double amount)\n}\nCheckoutController --> CreditCardPayment : hardcoded_new\nCheckoutController --> PayPalPayment : hardcoded_new\nstyle CheckoutController fill:#7f1d1d,stroke:#991b1b,stroke-width:2px\n",
+            "questions": [
+                {
+                    "question_id": "l4_q1",
+                    "skill_tag": "Dependency Injection of Strategies",
+                    "type": "radio",
+                    "text": "CheckoutController uses new CreditCardPayment() inside checkout(). How should PaymentStrategy be supplied so the controller stays testable and decoupled?",
+                    "choices": [
+                        "Inject PaymentStrategy through the constructor or setter; CheckoutController only calls strategy.execute()",
+                        "Use a static singleton PaymentStrategy.getInstance() accessed from every method",
+                        "Import concrete classes directly and pick one with Math.random() at runtime"
+                    ],
+                    "correct_answer": "Inject PaymentStrategy through the constructor or setter; CheckoutController only calls strategy.execute()",
+                    "explanation": "Injection inverts the dependency: the orchestrator receives an abstraction. Tests can inject mocks; production wiring chooses the real strategy elsewhere.",
+                    "uml_mutation": "classDiagram\nclass CheckoutController {\n    -PaymentStrategy strategy\n    +CheckoutController(PaymentStrategy strategy)\n    +checkout(Cart cart)\n}\nclass PaymentStrategy {\n    <<interface>>\n    +execute(double amount)\n}\nclass CreditCardPayment {\n    +execute(double amount)\n}\nclass PayPalPayment {\n    +execute(double amount)\n}\nPaymentStrategy <|.. CreditCardPayment\nPaymentStrategy <|.. PayPalPayment\nCheckoutController --> PaymentStrategy : injected\n",
+                    "coupling_impact": { "coupling": 18 }
+                },
+                {
+                    "question_id": "l4_q2",
+                    "skill_tag": "Factory / Registry Selection",
+                    "type": "checkbox",
+                    "text": "Users pick a payment method at checkout time. Which TWO patterns correctly select the concrete PaymentStrategy without polluting CheckoutController?",
+                    "choices": [
+                        "PaymentStrategyFactory.create(PaymentMethod method) returns the matching implementation",
+                        "A registry Map keyed by PaymentMethod enum that maps to strategy instances",
+                        "CheckoutController switch(method) { case CARD: return new CreditCardPayment() }",
+                        "Global static variable set to whichever payment class loaded last"
+                    ],
+                    "correct_answer": [
+                        "PaymentStrategyFactory.create(PaymentMethod method) returns the matching implementation",
+                        "A registry Map keyed by PaymentMethod enum that maps to strategy instances"
+                    ],
+                    "explanation": "Object creation for polymorphic families belongs in a factory or registry — one place to extend when CryptoPayment arrives. Controllers orchestrate; they should not construct concrete strategies.",
+                    "uml_mutation": "classDiagram\nclass CheckoutController {\n    -PaymentStrategy strategy\n    +checkout(Cart cart)\n}\nclass PaymentStrategyFactory {\n    +create(PaymentMethod method): PaymentStrategy\n}\nclass PaymentStrategy {\n    <<interface>>\n    +execute(double amount)\n}\nclass CreditCardPayment {\n    +execute(double amount)\n}\nclass PayPalPayment {\n    +execute(double amount)\n}\nclass CryptoPayment {\n    +execute(double amount)\n}\nclass PaymentMethod {\n    <<enumeration>>\n    CARD\n    PAYPAL\n    CRYPTO\n}\nPaymentStrategy <|.. CreditCardPayment\nPaymentStrategy <|.. PayPalPayment\nPaymentStrategy <|.. CryptoPayment\nCheckoutController --> PaymentStrategy : uses\nPaymentStrategyFactory ..> PaymentStrategy : creates\nPaymentStrategyFactory ..> PaymentMethod\n",
+                    "coupling_impact": { "coupling": 16 }
+                },
+                {
+                    "question_id": "l4_q3",
+                    "skill_tag": "Polymorphism Without Modification",
+                    "type": "radio",
+                    "text": "CryptoPayment launches tomorrow. CheckoutController and PaymentStrategyFactory already exist. What is the minimal, OCP-compliant change?",
+                    "choices": [
+                        "Implement CryptoPayment, register it in the factory/registry, add CRYPTO to PaymentMethod — CheckoutController unchanged",
+                        "Rewrite CheckoutController.checkout() to handle blockchain receipts inline",
+                        "Remove PaymentStrategy and inline all payment logic back into the controller for clarity"
+                    ],
+                    "correct_answer": "Implement CryptoPayment, register it in the factory/registry, add CRYPTO to PaymentMethod — CheckoutController unchanged",
+                    "explanation": "Composed polymorphism pays off here: new behavior is a new class plus wiring in the factory. The controller, tests, and API surface stay stable — the hallmark of mature runtime polymorphism.",
+                    "uml_mutation": "classDiagram\nclass CheckoutController {\n    -PaymentStrategy strategy\n    +checkout(Cart cart)\n}\nclass PaymentStrategyFactory {\n    +create(PaymentMethod method): PaymentStrategy\n}\nclass PaymentStrategy {\n    <<interface>>\n    +execute(double amount)\n}\nclass CreditCardPayment {\n    +execute(double amount)\n}\nclass PayPalPayment {\n    +execute(double amount)\n}\nclass CryptoPayment {\n    +execute(double amount)\n}\nclass PaymentMethod {\n    <<enumeration>>\n    CARD\n    PAYPAL\n    CRYPTO\n}\nPaymentStrategy <|.. CreditCardPayment\nPaymentStrategy <|.. PayPalPayment\nPaymentStrategy <|.. CryptoPayment\nCheckoutController --> PaymentStrategy : uses\nPaymentStrategyFactory ..> PaymentStrategy : creates\nstyle CheckoutController fill:#10b981,stroke:#047857\nstyle CryptoPayment fill:#f59e0b,stroke:#b45309\nstyle PaymentStrategyFactory fill:#10b981,stroke:#047857\n",
+                    "coupling_impact": { "coupling": 20 }
+                }
+            ]
+        }
+    ]
+}

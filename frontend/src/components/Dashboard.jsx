@@ -15,6 +15,14 @@ const DISCIPLINE_COPY = {
     ring: "focus-visible:ring-sky-500",
     borderHover: "hover:border-sky-500/70 hover:shadow-sky-950/20",
   },
+  clean_code: {
+    heading: "Clean Code Refactoring",
+    description:
+      "Pick a principles track. Untangle coupling, apply SOLID, and simplify over-engineered designs with live snapshot refactors.",
+    accent: "text-violet-400 group-hover:text-violet-300",
+    ring: "focus-visible:ring-violet-500",
+    borderHover: "hover:border-violet-500/70 hover:shadow-violet-950/20",
+  },
 };
 
 function TrackCard({ track, discipline, onSelect }) {

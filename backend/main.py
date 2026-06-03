@@ -11,7 +11,9 @@ from backend.canvas_engine import init_canvas
 from backend.hld_canvas_engine import init_hld_canvas
 
 CONTENT_DIR = Path(os.environ.get("CONTENT_DIR", "content"))
-DISCIPLINES = ("lld", "hld")
+DISCIPLINES = ("lld", "hld", "clean_code")
+DEFAULT_COUPLING_IMPACT = {"coupling": 12}
+DEFAULT_HEALTH_IMPACT = {"availability": 8, "latency": -15, "cost": 5}
 
 app = FastAPI(
     title="LLD/HLD Speedrun Gamifier API",
@@ -43,6 +45,7 @@ class ValidationResult(BaseModel):
     uml_mutation: str
     skill_tag: str
     health_impact: dict[str, int] | None = None
+    coupling_impact: dict[str, int] | None = None
 
 
 def _discover_config_paths() -> dict[str, Path]:
@@ -73,17 +76,28 @@ def _discover_config_paths() -> dict[str, Path]:
 
 
 def _config_discipline(config: dict[str, Any], config_path: Path | None = None) -> str:
-    discipline = config.get("discipline", "lld")
-    if discipline in DISCIPLINES:
-        return discipline
+    if "discipline" in config:
+        discipline = config["discipline"]
+        if discipline in DISCIPLINES:
+            return discipline
     if config_path and config_path.parent.parent.name in DISCIPLINES:
         return config_path.parent.parent.name
     return "lld"
 
 
+def _resolve_discipline(config: dict[str, Any]) -> str:
+    path = config.get("_config_path")
+    config_path = Path(path) if path else None
+    return _config_discipline(config, config_path)
+
+
 def _load_config(system_id: str) -> dict[str, Any]:
     if system_id in _config_cache:
-        return _config_cache[system_id]
+        cached = _config_cache[system_id]
+        path = cached.get("_config_path")
+        if path:
+            cached["discipline"] = _config_discipline(cached, Path(path))
+        return cached
 
     config_paths = _discover_config_paths()
     config_path = config_paths.get(system_id)
@@ -94,8 +108,7 @@ def _load_config(system_id: str) -> dict[str, Any]:
         config = json.load(f)
 
     config["_config_path"] = str(config_path)
-    if "discipline" not in config:
-        config["discipline"] = _config_discipline(config, config_path)
+    config["discipline"] = _config_discipline(config, config_path)
 
     _config_cache[system_id] = config
     return config
@@ -158,6 +171,13 @@ def _answers_match(question: dict[str, Any], selected: str | list[str]) -> bool:
 
 
 def _initial_canvas_for(config: dict[str, Any]) -> str:
+    if config.get("initial_canvas"):
+        return config["initial_canvas"]
+
+    levels = config.get("levels", [])
+    if levels and levels[0].get("initial_canvas"):
+        return levels[0]["initial_canvas"]
+
     if config.get("discipline") == "hld":
         return init_hld_canvas()
     return init_canvas()
@@ -179,6 +199,11 @@ def _sanitize_config(config: dict[str, Any]) -> dict[str, Any]:
                 "level_index": level["level_index"],
                 "title": level["title"],
                 "description": level.get("description", ""),
+                **(
+                    {"initial_canvas": level["initial_canvas"]}
+                    if level.get("initial_canvas")
+                    else {}
+                ),
                 "questions": [_sanitize_question(q) for q in level["questions"]],
             }
             for level in config["levels"]
@@ -195,7 +220,7 @@ def health():
 
 
 @app.get("/api/systems")
-def list_systems(discipline: Literal["lld", "hld"] = Query("lld")):
+def list_systems(discipline: Literal["lld", "hld", "clean_code"] = Query("lld")):
     """Return dashboard track cards for a discipline."""
     discovered = _discover_config_paths()
     manifest = _load_tracks_manifest(discipline)
@@ -267,9 +292,14 @@ def validate_answer(submission: AnswerSubmission):
     question = _find_question(config, submission.level_index, submission.question_id)
     is_correct = _answers_match(question, submission.selected_answer)
     health_impact = None
+    coupling_impact = None
 
-    if is_correct and config.get("discipline") == "hld":
-        health_impact = question.get("health_impact")
+    if is_correct:
+        discipline = _resolve_discipline(config)
+        if discipline == "hld":
+            health_impact = question.get("health_impact") or DEFAULT_HEALTH_IMPACT
+        elif discipline == "clean_code":
+            coupling_impact = question.get("coupling_impact") or DEFAULT_COUPLING_IMPACT
 
     return ValidationResult(
         is_correct=is_correct,
@@ -277,4 +307,5 @@ def validate_answer(submission: AnswerSubmission):
         uml_mutation=question["uml_mutation"] if is_correct else "",
         skill_tag=question["skill_tag"],
         health_impact=health_impact,
+        coupling_impact=coupling_impact,
     )
